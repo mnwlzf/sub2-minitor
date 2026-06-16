@@ -4,16 +4,22 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sub2.monitor.common.api.ApiResponse;
 import com.sub2.monitor.common.api.PageResponse;
+import com.sub2.monitor.dto.PlatformBalanceTrendResponse;
 import com.sub2.monitor.dto.PlatformSummaryResponse;
 import com.sub2.monitor.entity.AccountBalanceHistory;
 import com.sub2.monitor.entity.Accounts;
 import com.sub2.monitor.entity.Platform;
 import com.sub2.monitor.entity.PlatformRateHistory;
+import com.sub2.monitor.entity.TaskExecutionLog;
+import com.sub2.monitor.entity.TaskSchedule;
 import com.sub2.monitor.mapper.AccountBalanceHistoryMapper;
 import com.sub2.monitor.mapper.AccountsMapper;
 import com.sub2.monitor.mapper.PlatformRateHistoryMapper;
+import com.sub2.monitor.scheduler.QuartzJobNames;
 import com.sub2.monitor.scheduler.executor.BalanceChannelCollectExecutor;
 import com.sub2.monitor.service.PlatformService;
+import com.sub2.monitor.service.TaskExecutionLogService;
+import com.sub2.monitor.service.TaskScheduleService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,7 +36,9 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -46,17 +54,23 @@ public class PlatformController {
     private final AccountBalanceHistoryMapper accountBalanceHistoryMapper;
     private final PlatformRateHistoryMapper platformRateHistoryMapper;
     private final BalanceChannelCollectExecutor balanceChannelCollectExecutor;
+    private final TaskScheduleService taskScheduleService;
+    private final TaskExecutionLogService taskExecutionLogService;
 
     public PlatformController(PlatformService platformService,
                               AccountsMapper accountsMapper,
                               AccountBalanceHistoryMapper accountBalanceHistoryMapper,
                               PlatformRateHistoryMapper platformRateHistoryMapper,
-                              BalanceChannelCollectExecutor balanceChannelCollectExecutor) {
+                              BalanceChannelCollectExecutor balanceChannelCollectExecutor,
+                              TaskScheduleService taskScheduleService,
+                              TaskExecutionLogService taskExecutionLogService) {
         this.platformService = platformService;
         this.accountsMapper = accountsMapper;
         this.accountBalanceHistoryMapper = accountBalanceHistoryMapper;
         this.platformRateHistoryMapper = platformRateHistoryMapper;
         this.balanceChannelCollectExecutor = balanceChannelCollectExecutor;
+        this.taskScheduleService = taskScheduleService;
+        this.taskExecutionLogService = taskExecutionLogService;
     }
 
     @GetMapping
@@ -203,6 +217,48 @@ public class PlatformController {
         return ApiResponse.success(null);
     }
 
+    @GetMapping("/{id}/balance-trend")
+    public ApiResponse<PlatformBalanceTrendResponse> balanceTrend(@PathVariable Long id,
+                                                                  @RequestParam(required = false, defaultValue = "20") int limit) {
+        Platform platform = platformService.getById(id);
+        if (platform == null) {
+            return ApiResponse.failure(404, "platform not found");
+        }
+        List<Long> accountIds = accountsMapper.selectList(new LambdaQueryWrapper<Accounts>()
+                .select(Accounts::getId)
+                .eq(Accounts::getPlatformId, id))
+                .stream()
+                .map(Accounts::getId)
+                .toList();
+        if (accountIds.isEmpty()) {
+            PlatformBalanceTrendResponse response = new PlatformBalanceTrendResponse();
+            response.setPlatformId(platform.getId());
+            response.setPlatformName(platform.getName());
+            response.setCronExpression(loadBalanceCollectionCron());
+            response.setPoints(List.of());
+            return ApiResponse.success(response);
+        }
+
+        List<TaskExecutionLog> executionLogs = taskExecutionLogService.list(new LambdaQueryWrapper<TaskExecutionLog>()
+                .eq(TaskExecutionLog::getTaskKey, QuartzJobNames.BALANCE_CHANNEL_COLLECT_TASK_KEY)
+                .eq(TaskExecutionLog::getStatus, "SUCCESS")
+                .orderByDesc(TaskExecutionLog::getFireTime)
+                .last("limit " + Math.max(1, Math.min(limit, 200))));
+        List<PlatformBalanceTrendResponse.Point> points = executionLogs.stream()
+                .sorted((first, second) -> collectSlotTime(first).compareTo(collectSlotTime(second)))
+                .map(log -> buildBalanceTrendPoint(log, accountIds))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .toList();
+
+        PlatformBalanceTrendResponse response = new PlatformBalanceTrendResponse();
+        response.setPlatformId(platform.getId());
+        response.setPlatformName(platform.getName());
+        response.setCronExpression(loadBalanceCollectionCron());
+        response.setPoints(points);
+        return ApiResponse.success(response);
+    }
+
     private boolean isValidPlatformType(String type) {
         return type != null && PLATFORM_TYPES.contains(type);
     }
@@ -284,6 +340,45 @@ public class PlatformController {
             return BigDecimal.ONE;
         }
         return rechargeAmount.divide(receivedAmount, 8, RoundingMode.HALF_UP);
+    }
+
+    private String loadBalanceCollectionCron() {
+        TaskSchedule schedule = taskScheduleService.getOne(new LambdaQueryWrapper<TaskSchedule>()
+                .eq(TaskSchedule::getTaskKey, QuartzJobNames.BALANCE_CHANNEL_COLLECT_TASK_KEY));
+        return schedule == null ? "" : schedule.getCronExpression();
+    }
+
+    private Optional<PlatformBalanceTrendResponse.Point> buildBalanceTrendPoint(TaskExecutionLog log, List<Long> accountIds) {
+        OffsetDateTime slotStart = Optional.ofNullable(log.getFireTime()).orElse(log.getCreateTime());
+        if (slotStart == null) {
+            return Optional.empty();
+        }
+        OffsetDateTime slotEnd = Optional.ofNullable(log.getFinishTime()).orElse(slotStart.plusMinutes(10));
+        List<AccountBalanceHistory> histories = accountBalanceHistoryMapper.selectList(new LambdaQueryWrapper<AccountBalanceHistory>()
+                .in(AccountBalanceHistory::getAccountId, accountIds)
+                .ge(AccountBalanceHistory::getCreateTime, slotStart)
+                .le(AccountBalanceHistory::getCreateTime, slotEnd)
+                .orderByDesc(AccountBalanceHistory::getCreateTime)
+                .orderByDesc(AccountBalanceHistory::getId));
+        Map<Long, BigDecimal> latestBalanceMap = histories.stream()
+                .collect(Collectors.toMap(AccountBalanceHistory::getAccountId,
+                        AccountBalanceHistory::getCurrentBalance,
+                        (oldValue, ignored) -> oldValue));
+        if (latestBalanceMap.isEmpty()) {
+            return Optional.empty();
+        }
+        BigDecimal totalBalance = latestBalanceMap.values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+        PlatformBalanceTrendResponse.Point point = new PlatformBalanceTrendResponse.Point();
+        point.setTime(slotStart.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+        point.setBalance(totalBalance);
+        return Optional.of(point);
+    }
+
+    private OffsetDateTime collectSlotTime(TaskExecutionLog log) {
+        return Optional.ofNullable(log.getFireTime())
+                .orElse(Optional.ofNullable(log.getCreateTime()).orElse(OffsetDateTime.MIN));
     }
 
     private Map<Long, BigDecimal> yesterdayBalanceMap(List<Long> accountIds, LocalDate today) {

@@ -41,6 +41,18 @@ export interface PlatformSummary {
   accounts: PlatformAccountSummary[]
 }
 
+export interface PlatformBalanceTrendPoint {
+  time: string
+  balance: number
+}
+
+export interface PlatformBalanceTrend {
+  platformId: Id
+  platformName: string
+  cronExpression: string
+  points: PlatformBalanceTrendPoint[]
+}
+
 export function listPlatforms(params: { pageNo?: number; pageSize?: number; keyword?: string; isEnabled?: boolean }) {
   return http.get('/platforms', { params })
 }
@@ -59,6 +71,10 @@ export function updatePlatform(data: Platform) {
 
 export function collectPlatform(platformId: Id) {
   return http.post(`/platforms/${platformId}/collect`)
+}
+
+export function getPlatformBalanceTrend(platformId: Id, params: { limit?: number } = {}) {
+  return http.get(`/platforms/${platformId}/balance-trend`, { params })
 }
 
 export interface Account {
