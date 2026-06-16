@@ -66,6 +66,7 @@ export interface Account {
   username: string
   platformId: Id
   platformName?: string
+  platformBaseUrl?: string
   platformType?: PlatformType
   testModel?: string
   createTime?: string

@@ -632,7 +632,7 @@ onMounted(reload)
 }
 
 .overview-box__value--warn {
-  color: #b45309;
+  color: #dc2626;
 }
 
 .overview-box__value--danger {
@@ -740,7 +740,7 @@ onMounted(reload)
 }
 
 .account-stat__value--warn {
-  color: #b45309;
+  color: #dc2626;
 }
 
 .account-stat__value--danger {

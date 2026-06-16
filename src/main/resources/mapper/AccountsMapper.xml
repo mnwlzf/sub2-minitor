@@ -10,4 +10,19 @@
             #{name}
         </foreach>
     </select>
+
+    <select id="selectPageOrderByPlatformBaseUrl" resultType="com.sub2.monitor.entity.Accounts">
+        select a.*
+        from accounts a
+        left join platform p on p.id = a.platform_id
+        <where>
+            <if test="platformId != null">
+                a.platform_id = #{platformId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                and a.username like concat('%', #{keyword}, '%')
+            </if>
+        </where>
+        order by p.base_url asc nulls last, a.platform_id desc, a.id desc
+    </select>
 </mapper>

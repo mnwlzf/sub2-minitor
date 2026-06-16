@@ -10,6 +10,7 @@ public class AccountResponse {
     private String username;
     private Long platformId;
     private String platformName;
+    private String platformBaseUrl;
     private String platformType;
     private String testModel;
     private OffsetDateTime createTime;

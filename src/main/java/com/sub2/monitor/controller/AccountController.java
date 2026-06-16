@@ -1,13 +1,13 @@
 package com.sub2.monitor.controller;
 
 import cn.hutool.core.util.StrUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sub2.monitor.common.api.ApiResponse;
 import com.sub2.monitor.common.api.PageResponse;
 import com.sub2.monitor.dto.AccountResponse;
 import com.sub2.monitor.entity.Accounts;
 import com.sub2.monitor.entity.Platform;
+import com.sub2.monitor.mapper.AccountsMapper;
 import com.sub2.monitor.service.AccountsService;
 import com.sub2.monitor.service.PlatformService;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -31,10 +31,12 @@ public class AccountController {
 
     private final AccountsService accountsService;
     private final PlatformService platformService;
+    private final AccountsMapper accountsMapper;
 
-    public AccountController(AccountsService accountsService, PlatformService platformService) {
+    public AccountController(AccountsService accountsService, PlatformService platformService, AccountsMapper accountsMapper) {
         this.accountsService = accountsService;
         this.platformService = platformService;
+        this.accountsMapper = accountsMapper;
     }
 
     @GetMapping
@@ -42,11 +44,11 @@ public class AccountController {
                                                            @RequestParam(defaultValue = "20") long pageSize,
                                                            @RequestParam(required = false) Long platformId,
                                                            @RequestParam(required = false) String keyword) {
-        LambdaQueryWrapper<Accounts> wrapper = new LambdaQueryWrapper<Accounts>()
-                .eq(platformId != null, Accounts::getPlatformId, platformId)
-                .like(StrUtil.isNotBlank(keyword), Accounts::getUsername, keyword)
-                .orderByDesc(Accounts::getId);
-        Page<Accounts> page = accountsService.page(new Page<>(pageNo, pageSize), wrapper);
+        Page<Accounts> page = accountsMapper.selectPageOrderByPlatformBaseUrl(
+                new Page<>(pageNo, pageSize),
+                platformId,
+                StrUtil.isBlank(keyword) ? null : keyword
+        );
         List<Long> platformIds = page.getRecords().stream()
                 .map(Accounts::getPlatformId)
                 .distinct()
@@ -138,6 +140,7 @@ public class AccountController {
         response.setCreateTime(account.getCreateTime());
         if (platform != null) {
             response.setPlatformName(platform.getName());
+            response.setPlatformBaseUrl(platform.getBaseUrl());
             response.setPlatformType(platform.getType());
         }
         return response;
