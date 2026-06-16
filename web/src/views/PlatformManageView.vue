@@ -202,14 +202,15 @@ import {
   listPlatformSummaries,
   savePlatform,
   updatePlatform,
+  type Id,
   type PlatformSummary,
   type PlatformType
 } from '@/api/monitor'
 
 const loading = ref(false)
 const saving = ref(false)
-const toggleLoadingIds = ref(new Set<number>())
-const collectLoadingIds = ref(new Set<number>())
+const toggleLoadingIds = ref(new Set<Id>())
+const collectLoadingIds = ref(new Set<Id>())
 const collectAllLoading = ref(false)
 const platforms = ref<PlatformSummary[]>([])
 const total = ref(0)
@@ -228,7 +229,7 @@ const filters = reactive<{
 })
 
 const form = reactive({
-  id: 0,
+  id: '',
   name: '',
   baseUrl: '',
   type: 'sub2Api' as PlatformType,
@@ -261,7 +262,7 @@ const rules: FormRules = {
 }
 
 function resetForm() {
-  form.id = 0
+  form.id = ''
   form.name = ''
   form.baseUrl = ''
   form.type = 'sub2Api'

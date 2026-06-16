@@ -1,7 +1,9 @@
 import { http } from './http'
 
+export type Id = string
+
 export interface Platform {
-  id: number
+  id: Id
   baseUrl: string
   name: string
   type: PlatformType
@@ -13,7 +15,7 @@ export interface Platform {
 export type PlatformType = 'sub2Api' | 'newApi'
 
 export interface PlatformAccountSummary {
-  accountId: number
+  accountId: Id
   username: string
   latestBalance: number
   todayConsume: number
@@ -21,7 +23,7 @@ export interface PlatformAccountSummary {
 }
 
 export interface PlatformSummary {
-  platformId: number
+  platformId: Id
   platformName: string
   baseUrl: string
   type: PlatformType
@@ -54,14 +56,14 @@ export function updatePlatform(data: Platform) {
   return http.put('/platforms', data)
 }
 
-export function collectPlatform(platformId: number) {
+export function collectPlatform(platformId: Id) {
   return http.post(`/platforms/${platformId}/collect`)
 }
 
 export interface Account {
-  id: number
+  id: Id
   username: string
-  platformId: number
+  platformId: Id
   platformName?: string
   platformType?: PlatformType
   testModel?: string
@@ -69,14 +71,14 @@ export interface Account {
 }
 
 export interface AccountPayload {
-  id?: number
+  id?: Id
   username: string
   password?: string
-  platformId: number
+  platformId: Id
   testModel?: string
 }
 
-export function listAccounts(params: { pageNo?: number; pageSize?: number; platformId?: number; keyword?: string }) {
+export function listAccounts(params: { pageNo?: number; pageSize?: number; platformId?: Id; keyword?: string }) {
   return http.get('/accounts', { params })
 }
 
@@ -88,7 +90,7 @@ export function updateAccount(data: AccountPayload) {
   return http.put('/accounts', data)
 }
 
-export function deleteAccount(id: number) {
+export function deleteAccount(id: Id) {
   return http.delete(`/accounts/${id}`)
 }
 
@@ -99,7 +101,7 @@ export interface GroupRate {
 }
 
 export interface PlatformGroupSummary {
-  platformId: number
+  platformId: Id
   platformName: string
   baseUrl: string
   type: PlatformType
@@ -114,7 +116,7 @@ export function listPlatformGroups(params: { pageNo?: number; pageSize?: number;
 }
 
 export interface TaskSchedule {
-  id: number
+  id: Id
   taskKey: string
   taskName: string
   taskGroup?: string
@@ -127,7 +129,7 @@ export interface TaskSchedule {
 }
 
 export interface TaskExecutionLog {
-  id: number
+  id: Id
   taskKey: string
   taskName: string
   cronExpression?: string

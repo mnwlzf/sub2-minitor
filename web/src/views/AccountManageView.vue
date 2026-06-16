@@ -118,6 +118,7 @@ import {
   saveAccount,
   updateAccount,
   type Account,
+  type Id,
   type Platform,
   type PlatformType
 } from '@/api/monitor'
@@ -134,7 +135,7 @@ const dialogMode = ref<'create' | 'edit'>('create')
 const formRef = ref<FormInstance>()
 
 const filters = reactive<{
-  platformId?: number
+  platformId?: Id
   keyword: string
 }>({
   platformId: undefined,
@@ -142,8 +143,8 @@ const filters = reactive<{
 })
 
 const form = reactive({
-  id: 0,
-  platformId: undefined as number | undefined,
+  id: '',
+  platformId: undefined as Id | undefined,
   username: '',
   password: '',
   testModel: ''
@@ -179,7 +180,7 @@ async function reload() {
 }
 
 function resetForm() {
-  form.id = 0
+  form.id = ''
   form.platformId = filters.platformId
   form.username = ''
   form.password = ''
