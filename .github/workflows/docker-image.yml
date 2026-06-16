@@ -58,5 +58,8 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VITE_BASE_PATH=/sub-monitor/
+            VITE_API_BASE_URL=/sub-monitor/api
           cache-from: type=gha
           cache-to: type=gha,mode=max

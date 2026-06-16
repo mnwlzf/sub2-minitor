@@ -1,5 +1,9 @@
 FROM maven:3.9-eclipse-temurin-21 AS app-build
 WORKDIR /app
+ARG VITE_BASE_PATH=/
+ARG VITE_API_BASE_URL=/api
+ENV VITE_BASE_PATH=${VITE_BASE_PATH}
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 COPY pom.xml mvnw ./
 COPY .mvn .mvn
 COPY web/package*.json web/
