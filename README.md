@@ -11,6 +11,8 @@
 ## 快速启动
 
 ```bash
+cp .env.example .env
+# 修改 .env 中的必填外部配置后启动
 docker compose up
 ```
 
@@ -18,10 +20,47 @@ docker compose up
 
 访问：
 
-- 前端：http://localhost:5173
+- 前端：http://localhost:8080
 - 后端：http://localhost:8080/actuator/health
 
+Docker 镜像默认使用：
+
+- `ghcr.io/mnwlzf/sub2-minitor:master`
+
+部署时需要通过 `.env` 或宿主机环境变量注入：
+
+- `POSTGRES_PASSWORD`
+- `APP_MAIN_DB_PASSWORD`
+- `SUB2API_DB_URL`
+- `SUB2API_DB_USERNAME`
+- `SUB2API_DB_PASSWORD`
+- `SPRING_AI_OPENAI_API_KEY`
+
 ## 本地开发
+
+项目支持两种启动方式：
+
+- 单体模式：后端直接托管前端静态资源，访问 `http://localhost:8080`
+- 前后端分离模式：后端 `8080`，前端 Vite `5173`，前端通过 `/api` 代理到后端
+
+单体模式构建：
+
+```bash
+./mvnw -Pwith-web -DskipTests package
+java -jar target/sub2-monitor-1.0.0-SNAPSHOT.jar
+```
+
+前后端分离模式：
+
+```bash
+./mvnw spring-boot:run
+```
+
+```bash
+cd web
+npm install
+npm run dev
+```
 
 配置文件：
 
@@ -41,17 +80,16 @@ docker compose up
 - `SPRING_AI_OPENAI_BASE_URL`
 - `SPRING_AI_OPENAI_API_KEY`
 
-后端：
+后端单独启动：
 
 ```bash
-cd backend
 mvn spring-boot:run
 ```
 
-前端：
+前端单独启动：
 
 ```bash
-cd frontend
+cd web
 npm install
 npm run dev
 ```
