@@ -3,6 +3,7 @@ import MainLayout from '@/layouts/MainLayout.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import AccountManageView from '@/views/AccountManageView.vue'
 import PlatformManageView from '@/views/PlatformManageView.vue'
+import BalanceTrendView from '@/views/BalanceTrendView.vue'
 import PlatformGroupView from '@/views/PlatformGroupView.vue'
 import SchedulerEditView from '@/views/SchedulerEditView.vue'
 import SchedulerLogView from '@/views/SchedulerLogView.vue'
@@ -25,6 +26,12 @@ const router = createRouter({
           name: 'platforms',
           component: PlatformManageView,
           meta: { title: '平台管理' }
+        },
+        {
+          path: 'balance-trend',
+          name: 'balance-trend',
+          component: BalanceTrendView,
+          meta: { title: '余额变化曲线' }
         },
         {
           path: 'accounts',

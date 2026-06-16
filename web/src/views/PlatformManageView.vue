@@ -112,52 +112,6 @@
             </div>
           </section>
 
-          <section class="platform-card__trend">
-            <div class="section-title section-title--inline">
-              <span>余额变化曲线</span>
-              <span class="trend-cron">Cron {{ balanceTrend(platform.platformId)?.cronExpression || '-' }}</span>
-            </div>
-            <div v-loading="balanceTrendLoadingIds.has(platform.platformId)" class="trend-chart">
-              <el-empty
-                v-if="!balanceTrendLoadingIds.has(platform.platformId) && trendPoints(platform.platformId).length === 0"
-                description="暂无余额历史"
-              />
-              <svg
-                v-else
-                class="trend-chart__svg"
-                viewBox="0 0 720 220"
-                preserveAspectRatio="none"
-                role="img"
-              >
-                <line x1="42" y1="20" x2="42" y2="176" class="trend-axis" />
-                <line x1="42" y1="176" x2="700" y2="176" class="trend-axis" />
-                <polyline :points="trendPolyline(platform.platformId)" class="trend-line" />
-                <circle
-                  v-for="point in trendSvgPoints(platform.platformId)"
-                  :key="point.key"
-                  :cx="point.x"
-                  :cy="point.y"
-                  r="4"
-                  class="trend-dot"
-                >
-                  <title>{{ point.label }}</title>
-                </circle>
-                <text
-                  v-for="tick in trendTicks(platform.platformId)"
-                  :key="tick.key"
-                  :x="tick.x"
-                  y="202"
-                  class="trend-tick"
-                  text-anchor="middle"
-                >
-                  {{ tick.label }}
-                </text>
-                <text x="14" y="28" class="trend-scale">{{ trendMaxLabel(platform.platformId) }}</text>
-                <text x="14" y="176" class="trend-scale">{{ trendMinLabel(platform.platformId) }}</text>
-              </svg>
-            </div>
-          </section>
-
           <section class="platform-card__accounts">
             <div class="section-title">账号明细</div>
             <div class="account-list">
@@ -257,12 +211,10 @@ import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import {
   collectPlatform,
-  getPlatformBalanceTrend,
   listPlatformSummaries,
   savePlatform,
   updatePlatform,
   type Id,
-  type PlatformBalanceTrend,
   type PlatformSummary,
   type PlatformType
 } from '@/api/monitor'
@@ -272,9 +224,7 @@ const saving = ref(false)
 const toggleLoadingIds = ref(new Set<Id>())
 const collectLoadingIds = ref(new Set<Id>())
 const collectAllLoading = ref(false)
-const balanceTrendLoadingIds = ref(new Set<Id>())
 const platforms = ref<PlatformSummary[]>([])
-const balanceTrends = ref<Record<string, PlatformBalanceTrend>>({})
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
@@ -362,26 +312,9 @@ async function reload() {
     })
     platforms.value = response.data.records
     total.value = response.data.total
-    await loadBalanceTrends()
   } finally {
     loading.value = false
   }
-}
-
-async function loadBalanceTrends() {
-  const visiblePlatforms = platforms.value
-  await Promise.all(visiblePlatforms.map(async platform => {
-    balanceTrendLoadingIds.value.add(platform.platformId)
-    try {
-      const response = await getPlatformBalanceTrend(platform.platformId, { limit: 80 })
-      balanceTrends.value = {
-        ...balanceTrends.value,
-        [platform.platformId]: response.data
-      }
-    } finally {
-      balanceTrendLoadingIds.value.delete(platform.platformId)
-    }
-  }))
 }
 
 async function saveForm() {
@@ -498,81 +431,6 @@ function formatDateTime(value?: string) {
     minute: '2-digit',
     hour12: false
   })
-}
-
-function balanceTrend(platformId: Id) {
-  return balanceTrends.value[platformId]
-}
-
-function trendPoints(platformId: Id) {
-  return balanceTrend(platformId)?.points ?? []
-}
-
-function trendSvgPoints(platformId: Id) {
-  const points = trendPoints(platformId)
-  if (points.length === 0) {
-    return []
-  }
-  const balances = points.map(point => Number(point.balance ?? 0))
-  const min = Math.min(...balances)
-  const max = Math.max(...balances)
-  const range = max - min || 1
-  const width = 658
-  const height = 156
-  return points.map((point, index) => {
-    const x = 42 + (points.length === 1 ? width : (index / (points.length - 1)) * width)
-    const y = 176 - ((Number(point.balance ?? 0) - min) / range) * height
-    return {
-      key: `${point.time}-${index}`,
-      x,
-      y,
-      label: `${formatChartTime(point.time)} ${formatAmount(point.balance)}`
-    }
-  })
-}
-
-function trendPolyline(platformId: Id) {
-  return trendSvgPoints(platformId).map(point => `${point.x},${point.y}`).join(' ')
-}
-
-function trendTicks(platformId: Id) {
-  const points = trendPoints(platformId)
-  if (points.length === 0) {
-    return []
-  }
-  const candidateIndexes = Array.from(new Set([
-    0,
-    Math.floor((points.length - 1) / 2),
-    points.length - 1
-  ]))
-  const svgPoints = trendSvgPoints(platformId)
-  return candidateIndexes.map(index => ({
-    key: `${points[index].time}-${index}`,
-    x: svgPoints[index].x,
-    label: formatChartTime(points[index].time)
-  }))
-}
-
-function trendMinLabel(platformId: Id) {
-  const balances = trendPoints(platformId).map(point => Number(point.balance ?? 0))
-  return balances.length === 0 ? '-' : Math.min(...balances).toFixed(2)
-}
-
-function trendMaxLabel(platformId: Id) {
-  const balances = trendPoints(platformId).map(point => Number(point.balance ?? 0))
-  return balances.length === 0 ? '-' : Math.max(...balances).toFixed(2)
-}
-
-function formatChartTime(value?: string) {
-  if (!value) {
-    return '-'
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-  const pad = (num: number) => String(num).padStart(2, '0')
-  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 function platformTypeLabel(type?: PlatformType) {
@@ -795,66 +653,6 @@ onMounted(reload)
   color: #0f172a;
   font-size: 13px;
   font-weight: 700;
-}
-
-.section-title--inline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.platform-card__trend {
-  margin-top: 16px;
-}
-
-.trend-cron {
-  overflow: hidden;
-  color: #64748b;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 12px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.trend-chart {
-  min-height: 240px;
-  border: 1px solid #edf2f7;
-  border-radius: 8px;
-  background: #fbfdff;
-  padding: 12px;
-}
-
-.trend-chart__svg {
-  display: block;
-  width: 100%;
-  height: 220px;
-}
-
-.trend-axis {
-  stroke: #dbe3ee;
-  stroke-width: 1;
-}
-
-.trend-line {
-  fill: none;
-  stroke: #2563eb;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 3;
-}
-
-.trend-dot {
-  fill: #fff;
-  stroke: #2563eb;
-  stroke-width: 2;
-}
-
-.trend-tick,
-.trend-scale {
-  fill: #64748b;
-  font-size: 11px;
 }
 
 .account-list {

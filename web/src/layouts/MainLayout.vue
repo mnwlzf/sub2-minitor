@@ -23,6 +23,10 @@
           <el-icon><Grid /></el-icon>
           <span>平台管理</span>
         </el-menu-item>
+        <el-menu-item index="/balance-trend">
+          <el-icon><TrendCharts /></el-icon>
+          <span>余额变化曲线</span>
+        </el-menu-item>
         <el-menu-item index="/accounts">
           <el-icon><User /></el-icon>
           <span>账号管理</span>
@@ -61,7 +65,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { Calendar, Collection, DataBoard, Grid, User } from '@element-plus/icons-vue'
+import { Calendar, Collection, DataBoard, Grid, TrendCharts, User } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const activePath = computed(() => route.path)
