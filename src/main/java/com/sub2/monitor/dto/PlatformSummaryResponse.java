@@ -32,5 +32,6 @@ public class PlatformSummaryResponse {
         private BigDecimal todayConsume;
         private BigDecimal actualConsume;
         private String testModel;
+        private OffsetDateTime lastCollectTime;
     }
 }

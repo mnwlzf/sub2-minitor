@@ -10,7 +10,14 @@ public class PlatformBalanceTrendResponse {
     private Long platformId;
     private String platformName;
     private String cronExpression;
-    private List<Point> points;
+    private List<AccountTrend> accounts;
+
+    @Data
+    public static class AccountTrend {
+        private Long accountId;
+        private String username;
+        private List<Point> points;
+    }
 
     @Data
     public static class Point {

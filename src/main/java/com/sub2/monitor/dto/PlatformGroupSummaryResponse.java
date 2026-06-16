@@ -13,6 +13,9 @@ public class PlatformGroupSummaryResponse {
     private String baseUrl;
     private String type;
     private Boolean isEnabled;
+    private BigDecimal rechargeAmount;
+    private BigDecimal receivedAmount;
+    private BigDecimal deductRate;
     private long groupCount;
     private OffsetDateTime lastCollectTime;
     private List<GroupRate> groups;
@@ -21,6 +24,7 @@ public class PlatformGroupSummaryResponse {
     public static class GroupRate {
         private String groupName;
         private BigDecimal currentRate;
+        private BigDecimal actualRate;
         private OffsetDateTime collectTime;
     }
 }

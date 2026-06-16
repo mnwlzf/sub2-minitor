@@ -21,6 +21,7 @@ export interface PlatformAccountSummary {
   todayConsume: number
   actualConsume: number
   testModel?: string
+  lastCollectTime?: string
 }
 
 export interface PlatformSummary {
@@ -50,6 +51,12 @@ export interface PlatformBalanceTrend {
   platformId: Id
   platformName: string
   cronExpression: string
+  accounts: PlatformBalanceAccountTrend[]
+}
+
+export interface PlatformBalanceAccountTrend {
+  accountId: Id
+  username: string
   points: PlatformBalanceTrendPoint[]
 }
 
@@ -115,6 +122,7 @@ export function deleteAccount(id: Id) {
 export interface GroupRate {
   groupName: string
   currentRate: number
+  actualRate: number
   collectTime?: string
 }
 
@@ -124,6 +132,9 @@ export interface PlatformGroupSummary {
   baseUrl: string
   type: PlatformType
   isEnabled: boolean
+  rechargeAmount: number
+  receivedAmount: number
+  deductRate: number
   groupCount: number
   lastCollectTime?: string
   groups: GroupRate[]

@@ -36,6 +36,14 @@
               </div>
             </div>
             <div class="platform-card__stats">
+              <div class="stat-box stat-box--wide">
+                <span>充值 / 到账</span>
+                <strong>{{ formatAmount(platform.rechargeAmount) }} / {{ formatAmount(platform.receivedAmount) }}</strong>
+              </div>
+              <div class="stat-box">
+                <span>折算比例</span>
+                <strong>{{ formatRate(platform.deductRate) }}</strong>
+              </div>
               <div class="stat-box">
                 <span>分组数</span>
                 <strong>{{ platform.groupCount }}</strong>
@@ -54,7 +62,10 @@
                 <div class="group-item__name">{{ group.groupName }}</div>
                 <div class="group-item__time">{{ formatDateTime(group.collectTime) }}</div>
               </div>
-              <strong class="group-item__rate">{{ formatRate(group.currentRate) }}</strong>
+              <div class="group-item__rates">
+                <span>平台 {{ formatRate(group.currentRate) }}</span>
+                <strong>实际 {{ formatRate(group.actualRate) }}</strong>
+              </div>
             </article>
           </section>
         </article>
@@ -129,6 +140,10 @@ function platformTypeLabel(type?: PlatformType) {
 
 function formatRate(value?: number) {
   return Number(value ?? 0).toFixed(4)
+}
+
+function formatAmount(value?: number) {
+  return Number(value ?? 0).toFixed(2)
 }
 
 function formatDateTime(value?: string) {
@@ -259,6 +274,10 @@ onMounted(reload)
   min-width: 150px;
 }
 
+.stat-box--wide {
+  min-width: 136px;
+}
+
 .stat-box span {
   display: block;
   color: #64748b;
@@ -317,13 +336,25 @@ onMounted(reload)
   white-space: nowrap;
 }
 
-.group-item__rate {
+.group-item__rates {
+  display: flex;
   flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.group-item__rates span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.group-item__rates strong {
   border-radius: 6px;
   background: #ecfdf5;
   color: #047857;
-  padding: 7px 9px;
-  font-size: 14px;
+  padding: 6px 8px;
+  font-size: 13px;
 }
 
 .pager {

@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -92,18 +94,31 @@ public class PlatformGroupController {
         response.setBaseUrl(platform.getBaseUrl());
         response.setType(platform.getType());
         response.setIsEnabled(platform.getIsEnabled());
+        response.setRechargeAmount(platform.getRechargeAmount());
+        response.setReceivedAmount(platform.getReceivedAmount());
+        response.setDeductRate(toDeductRate(platform).setScale(4, RoundingMode.HALF_UP));
         response.setGroupCount(histories.size());
         response.setLastCollectTime(latestTime(histories));
-        response.setGroups(histories.stream().map(this::toGroupRate).toList());
+        response.setGroups(histories.stream().map(history -> toGroupRate(history, platform)).toList());
         return response;
     }
 
-    private PlatformGroupSummaryResponse.GroupRate toGroupRate(PlatformRateHistory history) {
+    private PlatformGroupSummaryResponse.GroupRate toGroupRate(PlatformRateHistory history, Platform platform) {
         PlatformGroupSummaryResponse.GroupRate groupRate = new PlatformGroupSummaryResponse.GroupRate();
         groupRate.setGroupName(history.getChannelName());
         groupRate.setCurrentRate(history.getCurrentRate());
+        groupRate.setActualRate(history.getCurrentRate().multiply(toDeductRate(platform)).setScale(4, RoundingMode.HALF_UP));
         groupRate.setCollectTime(history.getCreateTime());
         return groupRate;
+    }
+
+    private BigDecimal toDeductRate(Platform platform) {
+        BigDecimal rechargeAmount = platform.getRechargeAmount() == null ? BigDecimal.ZERO : platform.getRechargeAmount();
+        BigDecimal receivedAmount = platform.getReceivedAmount() == null ? BigDecimal.ZERO : platform.getReceivedAmount();
+        if (receivedAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ONE;
+        }
+        return rechargeAmount.divide(receivedAmount, 8, RoundingMode.HALF_UP);
     }
 
     private OffsetDateTime latestTime(List<PlatformRateHistory> histories) {

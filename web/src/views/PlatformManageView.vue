@@ -107,15 +107,13 @@
           </section>
 
           <section class="platform-card__accounts">
-            <div class="section-title section-title--with-meta">
-              <span>账号明细</span>
-              <span class="section-title__meta">最后采集 {{ formatDateTime(platform.lastCollectTime) }}</span>
-            </div>
+            <div class="section-title">账号明细</div>
             <div class="account-list">
               <article v-for="account in platform.accounts" :key="account.accountId" class="account-item">
                 <div class="account-item__main">
                   <div class="account-item__mark">{{ platformInitial(account.username) }}</div>
                   <div class="account-item__body">
+                    <div class="account-item__time">测试时间 {{ formatDateTime(account.lastCollectTime) }}</div>
                     <div class="account-item__name">{{ account.username }}</div>
                     <div class="account-item__model">{{ account.testModel || '未设置测试模型' }}</div>
                   </div>
@@ -652,18 +650,6 @@ onMounted(reload)
   font-weight: 700;
 }
 
-.section-title--with-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.section-title__meta {
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 500;
-}
-
 .account-list {
   display: flex;
   flex-direction: column;
@@ -710,6 +696,13 @@ onMounted(reload)
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.account-item__time {
+  margin-bottom: 4px;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .account-item__model {
