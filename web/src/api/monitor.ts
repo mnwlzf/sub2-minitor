@@ -1,0 +1,207 @@
+import { http } from './http'
+
+export interface Platform {
+  id: number
+  baseUrl: string
+  name: string
+  type: PlatformType
+  isEnabled: boolean
+  rechargeAmount: number
+  receivedAmount: number
+}
+
+export type PlatformType = 'sub2Api' | 'newApi'
+
+export interface PlatformAccountSummary {
+  accountId: number
+  username: string
+  latestBalance: number
+  todayConsume: number
+  testModel?: string
+}
+
+export interface PlatformSummary {
+  platformId: number
+  platformName: string
+  baseUrl: string
+  type: PlatformType
+  isEnabled: boolean
+  rechargeAmount: number
+  receivedAmount: number
+  accountCount: number
+  totalBalance: number
+  totalTodayConsume: number
+  totalPlatformDeduct: number
+  totalActualConsume: number
+  avgDeductRate: number
+  lastCollectTime?: string
+  accounts: PlatformAccountSummary[]
+}
+
+export function listPlatforms(params: { pageNo?: number; pageSize?: number; keyword?: string; isEnabled?: boolean }) {
+  return http.get('/platforms', { params })
+}
+
+export function listPlatformSummaries(params: { pageNo?: number; pageSize?: number; keyword?: string; isEnabled?: boolean }) {
+  return http.get('/platforms/summary', { params })
+}
+
+export function savePlatform(data: Omit<Platform, 'id'>) {
+  return http.post('/platforms', data)
+}
+
+export function updatePlatform(data: Platform) {
+  return http.put('/platforms', data)
+}
+
+export function collectPlatform(platformId: number) {
+  return http.post(`/platforms/${platformId}/collect`)
+}
+
+export interface Account {
+  id: number
+  username: string
+  platformId: number
+  platformName?: string
+  platformType?: PlatformType
+  testModel?: string
+  createTime?: string
+}
+
+export interface AccountPayload {
+  id?: number
+  username: string
+  password?: string
+  platformId: number
+  testModel?: string
+}
+
+export function listAccounts(params: { pageNo?: number; pageSize?: number; platformId?: number; keyword?: string }) {
+  return http.get('/accounts', { params })
+}
+
+export function saveAccount(data: AccountPayload) {
+  return http.post('/accounts', data)
+}
+
+export function updateAccount(data: AccountPayload) {
+  return http.put('/accounts', data)
+}
+
+export function deleteAccount(id: number) {
+  return http.delete(`/accounts/${id}`)
+}
+
+export interface GroupRate {
+  groupName: string
+  currentRate: number
+  collectTime?: string
+}
+
+export interface PlatformGroupSummary {
+  platformId: number
+  platformName: string
+  baseUrl: string
+  type: PlatformType
+  isEnabled: boolean
+  groupCount: number
+  lastCollectTime?: string
+  groups: GroupRate[]
+}
+
+export function listPlatformGroups(params: { pageNo?: number; pageSize?: number; keyword?: string; isEnabled?: boolean }) {
+  return http.get('/platform-groups', { params })
+}
+
+export interface TaskSchedule {
+  id: number
+  taskKey: string
+  taskName: string
+  taskGroup?: string
+  cronExpression: string
+  jobClass: string
+  description?: string
+  isEnabled: boolean
+  createTime?: string
+  updateTime?: string
+}
+
+export interface TaskExecutionLog {
+  id: number
+  taskKey: string
+  taskName: string
+  cronExpression?: string
+  triggerType: string
+  status: string
+  message?: string
+  fireTime?: string
+  finishTime?: string
+  createTime?: string
+}
+
+export function listTasks(params: { pageNo?: number; pageSize?: number; keyword?: string; taskGroup?: string }) {
+  return http.get('/tasks', { params })
+}
+
+export function saveTask(data: {
+  taskKey: string
+  taskName: string
+  taskGroup: string
+  cronExpression: string
+  jobClass: string
+  description?: string
+  isEnabled?: boolean
+}) {
+  return http.post('/tasks', data)
+}
+
+export function updateTask(data: {
+  taskKey: string
+  taskName: string
+  taskGroup: string
+  cronExpression: string
+  jobClass: string
+  description?: string
+  isEnabled?: boolean
+}) {
+  return http.put('/tasks', data)
+}
+
+export function runTask(data: { taskKey: string; taskGroup: string }) {
+  return http.post('/tasks/run', data)
+}
+
+export function pauseTask(data: { taskKey: string; taskGroup: string }) {
+  return http.post('/tasks/pause', data)
+}
+
+export function resumeTask(data: { taskKey: string; taskGroup: string }) {
+  return http.post('/tasks/resume', data)
+}
+
+export function removeTask(data: { taskKey: string; taskGroup: string }) {
+  return http.post('/tasks/remove', data)
+}
+
+export function previewCron(params: { cronExpression: string; count?: number }) {
+  return http.get('/tasks/preview', { params })
+}
+
+export function initBalanceCollectionTask(data: {
+  cronExpression: string
+  description?: string
+}) {
+  return http.post('/tasks/balance-collection/init', data)
+}
+
+export function updateBalanceCollectionCron(cronExpression: string) {
+  return http.put('/tasks/balance-collection/cron', null, { params: { cronExpression } })
+}
+
+export function runBalanceCollectionNow() {
+  return http.post('/tasks/balance-collection/run')
+}
+
+export function listBalanceCollectionLogs(params: { pageNo?: number; pageSize?: number }) {
+  return http.get('/tasks/balance-collection/logs', { params })
+}

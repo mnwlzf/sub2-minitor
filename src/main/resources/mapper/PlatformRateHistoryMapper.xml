@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sub2.monitor.mapper.PlatformRateHistoryMapper">
+    <insert id="insertBatch">
+        insert into platform_rate_history
+            (platform_id, channel_name, current_rate, create_time)
+        values
+        <foreach collection="historyList" item="history" separator=",">
+            (#{history.platformId}, #{history.channelName}, #{history.currentRate}, #{history.createTime})
+        </foreach>
+    </insert>
+</mapper>

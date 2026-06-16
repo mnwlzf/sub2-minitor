@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sub2.monitor.mapper.sub2api.Sub2ApiAccountMapper">
+    <!--
+        sub2api 账号代理联合查询结果映射。
+
+        这里显式写 resultMap，是为了避免数据库 snake_case 字段与 Java camelCase
+        属性之间依赖全局 mapUnderscoreToCamelCase 配置；即使全局配置变化，
+        该查询也能稳定映射。
+    -->
+    <resultMap id="Sub2ApiAccountProxyMap" type="com.sub2.monitor.dto.sub2api.Sub2ApiAccountProxy">
+        <id property="accountId" column="account_id"/>
+        <result property="name" column="name"/>
+        <result property="apiKey" column="api_key"/>
+        <result property="baseUrl" column="base_url"/>
+        <result property="proxyId" column="proxy_id"/>
+        <result property="proxyProtocol" column="proxy_protocol"/>
+        <result property="proxyHost" column="proxy_host"/>
+        <result property="proxyPort" column="proxy_port"/>
+        <result property="proxyUsername" column="proxy_username"/>
+        <result property="proxyPassword" column="proxy_password"/>
+    </resultMap>
+
+    <!--
+        根据平台 base_url 查询 sub2api.accounts，并关联 proxies 获取代理。
+
+        关键点：
+        1. credentials 是 jsonb，base_url/api_key 通过 PostgreSQL 的 ->> 运算符提取；
+        2. proxy_id 为空时 left join 仍返回账号，业务层会按直连处理；
+        3. 仅取 active 且未软删除账号，避免使用不可调度或已删除账号；
+        4. 按 priority desc、id asc 排序，调用方需要单条时直接取第一条即可。
+    -->
+    <select id="selectAccountProxiesByBaseUrl" resultMap="Sub2ApiAccountProxyMap">
+        select
+            a.id as account_id,
+            a.name,
+            a.credentials ->> 'api_key' as api_key,
+            a.credentials ->> 'base_url' as base_url,
+            a.proxy_id,
+            p.protocol as proxy_protocol,
+            p.host as proxy_host,
+            p.port as proxy_port,
+            p.username as proxy_username,
+            p.password as proxy_password
+        from accounts a
+        left join proxies p on p.id = a.proxy_id
+            and p.deleted_at is null
+            and p.status = 'active'
+        where a.deleted_at is null
+          and a.status = 'active'
+          and a.credentials ->> 'base_url' = #{baseUrl}
+        order by a.priority desc, a.id asc
+    </select>
+</mapper>

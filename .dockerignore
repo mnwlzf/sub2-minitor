@@ -1,0 +1,10 @@
+.git
+.github
+.idea
+.vscode
+target
+web/node_modules
+web/dist
+src/main/resources/application-local.yml
+.env
+*.log

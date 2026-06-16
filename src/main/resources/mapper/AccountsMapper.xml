@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sub2.monitor.mapper.AccountsMapper">
+    <select id="selectByNames" resultType="com.sub2.monitor.entity.Accounts">
+        select username, id,platform_id
+        from accounts
+        where platform_id = #{platformId}
+        and username in
+        <foreach collection="names" item="name" open="(" separator="," close=")">
+            #{name}
+        </foreach>
+    </select>
+</mapper>
