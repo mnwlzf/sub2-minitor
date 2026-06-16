@@ -79,12 +79,6 @@
 
           <section class="platform-card__overview">
             <div class="overview-box">
-              <span class="overview-box__label">最后采集</span>
-              <strong class="overview-box__value overview-box__value--time">
-                {{ formatDateTime(platform.lastCollectTime) }}
-              </strong>
-            </div>
-            <div class="overview-box">
               <span class="overview-box__label">账号数</span>
               <strong class="overview-box__value">{{ platform.accountCount }}</strong>
             </div>
@@ -113,7 +107,10 @@
           </section>
 
           <section class="platform-card__accounts">
-            <div class="section-title">账号明细</div>
+            <div class="section-title section-title--with-meta">
+              <span>账号明细</span>
+              <span class="section-title__meta">最后采集 {{ formatDateTime(platform.lastCollectTime) }}</span>
+            </div>
             <div class="account-list">
               <article v-for="account in platform.accounts" :key="account.accountId" class="account-item">
                 <div class="account-item__main">
@@ -607,7 +604,7 @@ onMounted(reload)
 
 .platform-card__overview {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
   margin-top: 16px;
 }
@@ -653,6 +650,18 @@ onMounted(reload)
   color: #0f172a;
   font-size: 13px;
   font-weight: 700;
+}
+
+.section-title--with-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-title__meta {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .account-list {
