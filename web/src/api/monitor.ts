@@ -19,6 +19,7 @@ export interface PlatformAccountSummary {
   username: string
   latestBalance: number
   todayConsume: number
+  actualConsume: number
   testModel?: string
 }
 

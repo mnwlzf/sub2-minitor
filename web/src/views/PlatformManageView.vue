@@ -93,9 +93,15 @@
               <strong class="overview-box__value">{{ formatAmount(platform.totalBalance) }}</strong>
             </div>
             <div class="overview-box">
-              <span class="overview-box__label">今日消耗</span>
+              <span class="overview-box__label">平台消耗</span>
               <strong class="overview-box__value overview-box__value--warn">
-                {{ formatAmount(platform.totalTodayConsume) }}
+                {{ formatAmount(platform.totalPlatformDeduct) }}
+              </strong>
+            </div>
+            <div class="overview-box">
+              <span class="overview-box__label">实际消耗</span>
+              <strong class="overview-box__value overview-box__value--danger">
+                {{ formatAmount(platform.totalActualConsume) }}
               </strong>
             </div>
             <div class="overview-box">
@@ -126,6 +132,12 @@
                     <span class="account-stat__label">今日消耗</span>
                     <span class="account-stat__value account-stat__value--warn">
                       {{ formatAmount(account.todayConsume) }}
+                    </span>
+                  </div>
+                  <div class="account-stat">
+                    <span class="account-stat__label">实际消耗</span>
+                    <span class="account-stat__value account-stat__value--danger">
+                      {{ formatAmount(account.actualConsume) }}
                     </span>
                   </div>
                 </div>
@@ -595,7 +607,7 @@ onMounted(reload)
 
 .platform-card__overview {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   margin-top: 16px;
 }
@@ -621,6 +633,10 @@ onMounted(reload)
 
 .overview-box__value--warn {
   color: #b45309;
+}
+
+.overview-box__value--danger {
+  color: #dc2626;
 }
 
 .overview-box__value--time {
@@ -725,6 +741,10 @@ onMounted(reload)
 
 .account-stat__value--warn {
   color: #b45309;
+}
+
+.account-stat__value--danger {
+  color: #dc2626;
 }
 
 .platform-dialog :deep(.el-dialog__body) {

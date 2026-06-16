@@ -137,6 +137,7 @@ public class PlatformController {
                 BigDecimal todayConsume = yesterdayBalance.subtract(latestBalance).setScale(2, RoundingMode.HALF_UP);
                 accountSummary.setLatestBalance(latestBalance);
                 accountSummary.setTodayConsume(todayConsume);
+                accountSummary.setActualConsume(toActualConsume(todayConsume, platform).setScale(2, RoundingMode.HALF_UP));
                 accountSummaries.add(accountSummary);
                 totalBalance = totalBalance.add(latestBalance);
                 totalTodayConsume = totalTodayConsume.add(todayConsume);

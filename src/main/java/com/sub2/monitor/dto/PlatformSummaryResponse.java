@@ -30,6 +30,7 @@ public class PlatformSummaryResponse {
         private String username;
         private BigDecimal latestBalance;
         private BigDecimal todayConsume;
+        private BigDecimal actualConsume;
         private String testModel;
     }
 }
