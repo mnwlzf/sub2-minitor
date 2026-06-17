@@ -3,7 +3,7 @@
     <div class="dashboard-header">
       <div>
         <h1 class="page-title">监控概览</h1>
-        <div class="page-subtitle">按平台、账号、分组和任务状态汇总当前监控面板。</div>
+        <div class="page-subtitle">优先展示余额、消耗、采集状态和失败任务，方便直接处理问题。</div>
       </div>
       <div class="dashboard-actions">
         <el-button :icon="Refresh" :loading="loading" @click="loadDashboard">刷新</el-button>
@@ -12,7 +12,7 @@
     </div>
 
     <section class="metric-grid">
-      <article v-for="item in metrics" :key="item.label" class="metric-card">
+      <article v-for="item in metrics" :key="item.label" class="metric-card" :class="item.className">
         <div class="metric-card__meta">
           <span>{{ item.label }}</span>
           <el-tag :type="item.type" effect="light" size="small">{{ item.status }}</el-tag>
@@ -22,35 +22,24 @@
       </article>
     </section>
 
-    <section class="dashboard-overview">
+    <section class="dashboard-main">
       <el-card class="page-card panel-card">
         <template #header>
           <div class="card-header">
-            <span>关键口径</span>
-            <el-button text type="primary" @click="router.push('/platforms')">查看平台</el-button>
+            <span>需要处理</span>
+            <el-button text type="primary" @click="router.push('/scheduler/logs')">执行日志</el-button>
           </div>
         </template>
 
-        <div class="summary-grid">
-          <article class="summary-box summary-box--blue">
-            <span class="summary-box__label">平台扣减</span>
-            <strong class="summary-box__value">{{ formatPrecise(summary.platformDeduct) }}</strong>
-            <small class="summary-box__sub">未折算前的今日消耗</small>
-          </article>
-          <article class="summary-box summary-box--green">
-            <span class="summary-box__label">实际消耗</span>
-            <strong class="summary-box__value">{{ formatPrecise(summary.actualConsume) }}</strong>
-            <small class="summary-box__sub">按充值 / 到账比例折算</small>
-          </article>
-          <article class="summary-box">
-            <span class="summary-box__label">平台均倍率</span>
-            <strong class="summary-box__value">{{ formatRate(summary.avgDeductRate) }}</strong>
-            <small class="summary-box__sub">充值 / 到账平均比例</small>
-          </article>
-          <article class="summary-box">
-            <span class="summary-box__label">分组总数</span>
-            <strong class="summary-box__value">{{ groupTotal }}</strong>
-            <small class="summary-box__sub">最新已采集的分组条目</small>
+        <div v-loading="loading" class="issue-list">
+          <el-empty v-if="issues.length === 0 && !loading" description="暂无待处理问题" />
+          <article v-for="issue in issues" :key="issue.key" class="issue-item" :class="`issue-item--${issue.level}`">
+            <div class="issue-item__badge">{{ issue.levelText }}</div>
+            <div class="issue-item__body">
+              <div class="issue-item__title">{{ issue.title }}</div>
+              <div class="issue-item__desc">{{ issue.description }}</div>
+            </div>
+            <el-button text type="primary" @click="router.push(issue.link)">处理</el-button>
           </article>
         </div>
       </el-card>
@@ -58,21 +47,21 @@
       <el-card class="page-card panel-card">
         <template #header>
           <div class="card-header">
-            <span>最近分组</span>
-            <el-button text type="primary" @click="router.push('/groups')">查看全部</el-button>
+            <span>消耗排行</span>
+            <el-button text type="primary" @click="router.push('/platforms')">平台详情</el-button>
           </div>
         </template>
 
-        <div v-loading="loading" class="group-overview">
-          <el-empty v-if="topGroups.length === 0 && !loading" description="暂无分组数据" />
-          <article v-for="group in topGroups" :key="`${group.platformId}-${group.groupName}`" class="group-overview__item">
-            <div class="group-overview__main">
-              <div class="group-overview__name">{{ group.platformName }}</div>
-              <div class="group-overview__sub">{{ group.groupName }}</div>
+        <div v-loading="loading" class="rank-list">
+          <el-empty v-if="topConsumeAccounts.length === 0 && !loading" description="暂无消耗数据" />
+          <article v-for="account in topConsumeAccounts" :key="account.key" class="rank-item">
+            <div class="rank-item__main">
+              <div class="rank-item__name">{{ account.username }}</div>
+              <div class="rank-item__sub">{{ account.platformName }}</div>
             </div>
-            <div class="group-overview__rate">
-              <span>倍率</span>
-              <strong>{{ formatRate(group.currentRate) }}</strong>
+            <div class="rank-item__amount">
+              <strong>{{ formatPrecise(account.actualConsume) }}</strong>
+              <span>实际消耗</span>
             </div>
           </article>
         </div>
@@ -90,12 +79,13 @@
 
         <div v-loading="loading" class="platform-list">
           <el-empty v-if="platforms.length === 0 && !loading" description="暂无平台" />
-          <article v-for="platform in platforms" :key="platform.platformId" class="platform-item">
+          <article v-for="platform in platformCards" :key="platform.platformId" class="platform-item">
             <div class="platform-item__main">
               <div class="platform-item__mark">{{ platformInitial(platform.platformName) }}</div>
               <div class="platform-item__content">
                 <div class="platform-item__title-row">
                   <div class="platform-item__name">{{ platform.platformName }}</div>
+                  <el-tag :type="platform.statusType" effect="light" size="small">{{ platform.statusText }}</el-tag>
                   <el-tag effect="plain" size="small">{{ platformTypeLabel(platform.type) }}</el-tag>
                 </div>
                 <div class="platform-item__url" :title="platform.baseUrl">{{ platform.baseUrl }}</div>
@@ -107,8 +97,56 @@
             </div>
             <div class="platform-item__amounts">
               <span>余额 {{ formatAmount(platform.totalBalance) }}</span>
-              <span class="warn">平台扣减 {{ formatPrecise(platform.totalPlatformDeduct) }}</span>
+              <span>今日扣减 {{ formatPrecise(platform.totalPlatformDeduct) }}</span>
               <span class="warn">实际消耗 {{ formatPrecise(platform.totalActualConsume) }}</span>
+            </div>
+          </article>
+        </div>
+      </el-card>
+
+      <el-card class="page-card panel-card">
+        <template #header>
+          <div class="card-header">
+            <span>低余额账号</span>
+            <el-button text type="primary" @click="router.push('/accounts')">账号列表</el-button>
+          </div>
+        </template>
+
+        <div v-loading="loading" class="rank-list">
+          <el-empty v-if="lowBalanceAccounts.length === 0 && !loading" description="暂无低余额账号" />
+          <article v-for="account in lowBalanceAccounts" :key="account.key" class="rank-item rank-item--balance">
+            <div class="rank-item__main">
+              <div class="rank-item__name">{{ account.username }}</div>
+              <div class="rank-item__sub">{{ account.platformName }}</div>
+            </div>
+            <div class="rank-item__amount">
+              <strong>{{ formatAmount(account.latestBalance) }}</strong>
+              <span>余额</span>
+            </div>
+          </article>
+        </div>
+      </el-card>
+    </section>
+
+    <section class="dashboard-layout dashboard-layout--bottom">
+      <el-card class="page-card panel-card">
+        <template #header>
+          <div class="card-header">
+            <span>倍率最高分组</span>
+            <el-button text type="primary" @click="router.push('/groups')">查看全部</el-button>
+          </div>
+        </template>
+
+        <div v-loading="loading" class="group-overview">
+          <el-empty v-if="topGroups.length === 0 && !loading" description="暂无分组数据" />
+          <article v-for="group in topGroups" :key="`${group.platformId}-${group.groupName}`" class="group-overview__item">
+            <div class="group-overview__main">
+              <div class="group-overview__name">{{ group.groupName }}</div>
+              <div class="group-overview__sub">{{ group.platformName }}</div>
+            </div>
+            <div class="group-overview__rate">
+              <span>实际倍率</span>
+              <strong>{{ formatRate(group.actualRate) }}</strong>
             </div>
           </article>
         </div>
@@ -174,12 +212,31 @@ import {
   listPlatformGroups,
   listPlatformSummaries,
   listTasks,
+  type PlatformAccountSummary,
   type PlatformGroupSummary,
   type PlatformSummary,
   type PlatformType,
   type TaskExecutionLog,
   type TaskSchedule
 } from '@/api/monitor'
+
+type TagType = 'success' | 'warning' | 'info' | 'primary' | 'danger'
+type IssueLevel = 'danger' | 'warning'
+
+interface AccountWithPlatform extends PlatformAccountSummary {
+  key: string
+  platformId: string
+  platformName: string
+}
+
+interface IssueItem {
+  key: string
+  level: IssueLevel
+  levelText: string
+  title: string
+  description: string
+  link: string
+}
 
 const router = useRouter()
 const loading = ref(false)
@@ -189,64 +246,141 @@ const tasks = ref<TaskSchedule[]>([])
 const logs = ref<TaskExecutionLog[]>([])
 
 const enabledPlatforms = computed(() => platforms.value.filter(item => item.isEnabled))
+const disabledPlatformCount = computed(() => platforms.value.length - enabledPlatforms.value.length)
 const failedLogCount = computed(() => logs.value.filter(item => item.status === 'FAILED').length)
-const groupTotal = computed(() => groups.value.reduce((sum, item) => sum + Number(item.groupCount || 0), 0))
+const runningLogCount = computed(() => logs.value.filter(item => item.status === 'RUNNING').length)
+const enabledTaskCount = computed(() => tasks.value.filter(item => item.isEnabled).length)
+const totalAccountCount = computed(() => platforms.value.reduce((sum, item) => sum + Number(item.accountCount || 0), 0))
+const totalBalance = computed(() => platforms.value.reduce((sum, item) => sum + Number(item.totalBalance || 0), 0))
+const totalActualConsume = computed(() => platforms.value.reduce((sum, item) => sum + Number(item.totalActualConsume || 0), 0))
+const allAccounts = computed<AccountWithPlatform[]>(() => platforms.value.flatMap(platform =>
+  (platform.accounts || []).map(account => ({
+    ...account,
+    key: `${platform.platformId}-${account.accountId}`,
+    platformId: platform.platformId,
+    platformName: platform.platformName
+  }))
+))
+const zeroBalanceAccounts = computed(() => allAccounts.value.filter(account => Number(account.latestBalance || 0) <= 0))
+const lowBalanceAccounts = computed(() => allAccounts.value
+  .filter(account => Number(account.latestBalance || 0) > 0)
+  .sort((a, b) => Number(a.latestBalance || 0) - Number(b.latestBalance || 0))
+  .slice(0, 8))
+const topConsumeAccounts = computed(() => allAccounts.value
+  .filter(account => Number(account.actualConsume || 0) > 0)
+  .sort((a, b) => Number(b.actualConsume || 0) - Number(a.actualConsume || 0))
+  .slice(0, 8))
+const stalePlatforms = computed(() => enabledPlatforms.value.filter(platform => isCollectStale(platform.lastCollectTime)))
 const topGroups = computed(() => groups.value.flatMap(platform =>
-  platform.groups.slice(0, 2).map(group => ({
+  platform.groups.map(group => ({
     platformId: platform.platformId,
     platformName: platform.platformName,
     ...group
   }))
-).slice(0, 6))
-const summary = computed(() => {
-  const totals = platforms.value.reduce((acc, platform) => {
-    acc.platformDeduct += Number(platform.totalPlatformDeduct ?? 0)
-    acc.actualConsume += Number(platform.totalActualConsume ?? 0)
-    acc.rateSum += Number(platform.avgDeductRate ?? 0)
-    acc.rateCount += platform.avgDeductRate == null ? 0 : 1
-    return acc
-  }, {
-    platformDeduct: 0,
-    actualConsume: 0,
-    rateSum: 0,
-    rateCount: 0
-  })
+).sort((a, b) => Number(b.actualRate || 0) - Number(a.actualRate || 0)).slice(0, 8))
+const platformCards = computed(() => platforms.value.map(platform => {
+  const stale = platform.isEnabled && isCollectStale(platform.lastCollectTime)
+  const statusText = !platform.isEnabled ? '未监控' : stale ? '采集滞后' : '监控中'
+  const statusType: TagType = !platform.isEnabled ? 'info' : stale ? 'warning' : 'success'
 
   return {
-    platformDeduct: totals.platformDeduct,
-    actualConsume: totals.actualConsume,
-    avgDeductRate: totals.rateCount > 0 ? totals.rateSum / totals.rateCount : 0
+    ...platform,
+    statusText,
+    statusType
   }
-})
+}))
+const issues = computed<IssueItem[]>(() => {
+  const items: IssueItem[] = []
 
+  if (failedLogCount.value > 0) {
+    items.push({
+      key: 'failed-logs',
+      level: 'danger',
+      levelText: '失败',
+      title: `${failedLogCount.value} 条最近任务执行失败`,
+      description: '优先查看采集任务是否失败，避免余额和倍率数据继续失真。',
+      link: '/scheduler/logs'
+    })
+  }
+
+  if (zeroBalanceAccounts.value.length > 0) {
+    items.push({
+      key: 'zero-balance',
+      level: 'danger',
+      levelText: '余额',
+      title: `${zeroBalanceAccounts.value.length} 个账号余额为 0`,
+      description: '这些账号可能已经无法继续消费，需要充值或停用。',
+      link: '/accounts'
+    })
+  }
+
+  if (stalePlatforms.value.length > 0) {
+    items.push({
+      key: 'stale-platforms',
+      level: 'warning',
+      levelText: '采集',
+      title: `${stalePlatforms.value.length} 个平台超过 24 小时未采集`,
+      description: stalePlatforms.value.map(item => item.platformName).slice(0, 3).join('、'),
+      link: '/platforms'
+    })
+  }
+
+  if (disabledPlatformCount.value > 0) {
+    items.push({
+      key: 'disabled-platforms',
+      level: 'warning',
+      levelText: '停用',
+      title: `${disabledPlatformCount.value} 个平台未开启监控`,
+      description: '确认是否为主动停用，避免遗漏平台数据。',
+      link: '/platforms'
+    })
+  }
+
+  if (enabledTaskCount.value === 0 && tasks.value.length > 0) {
+    items.push({
+      key: 'no-enabled-task',
+      level: 'warning',
+      levelText: '任务',
+      title: '当前没有启用的调度任务',
+      description: '余额、渠道和倍率不会自动更新。',
+      link: '/scheduler/edit'
+    })
+  }
+
+  return items.slice(0, 6)
+})
 const metrics = computed(() => [
   {
-    label: '平台总数',
-    value: String(platforms.value.length),
-    status: `${enabledPlatforms.value.length} 监控中`,
-    type: enabledPlatforms.value.length > 0 ? 'success' : 'info',
-    hint: '当前已维护的平台配置'
+    label: '当前总余额',
+    value: formatAmount(totalBalance.value),
+    status: `${totalAccountCount.value} 账号`,
+    type: totalBalance.value > 0 ? 'success' : 'danger',
+    className: '',
+    hint: `${platforms.value.length} 个平台，${enabledPlatforms.value.length} 个监控中`
   },
   {
-    label: '账号总数',
-    value: String(platforms.value.reduce((sum, item) => sum + Number(item.accountCount || 0), 0)),
-    status: '平台聚合',
-    type: 'info',
-    hint: '所有平台下的账号总和'
+    label: '今日实际消耗',
+    value: formatPrecise(totalActualConsume.value),
+    status: '已折算',
+    type: totalActualConsume.value > 0 ? 'warning' : 'info',
+    className: '',
+    hint: '按平台充值 / 到账比例折算后的消耗'
   },
   {
-    label: '分组总数',
-    value: String(groupTotal.value),
-    status: '最新倍率',
-    type: 'warning',
-    hint: '按平台采集到的分组记录'
+    label: '待处理问题',
+    value: String(issues.value.length),
+    status: issues.value.length > 0 ? '需处理' : '正常',
+    type: issues.value.length > 0 ? 'danger' : 'success',
+    className: issues.value.length > 0 ? 'metric-card--danger' : '',
+    hint: '汇总失败任务、零余额、采集滞后和停用平台'
   },
   {
-    label: '最近执行',
-    value: String(logs.value.length),
-    status: failedLogCount.value > 0 ? `${failedLogCount.value} 失败` : '正常',
-    type: failedLogCount.value > 0 ? 'danger' : 'success',
-    hint: '最近 10 条任务日志'
+    label: '调度状态',
+    value: `${enabledTaskCount.value}/${tasks.value.length}`,
+    status: failedLogCount.value > 0 ? `${failedLogCount.value} 失败` : runningLogCount.value > 0 ? '执行中' : '正常',
+    type: failedLogCount.value > 0 ? 'danger' : runningLogCount.value > 0 ? 'warning' : 'success',
+    className: '',
+    hint: '启用任务数 / 任务总数，结合最近执行结果判断'
   }
 ])
 
@@ -270,6 +404,17 @@ async function loadDashboard() {
 
 function platformInitial(name?: string) {
   return (name || 'P').trim().slice(0, 1).toUpperCase()
+}
+
+function isCollectStale(value?: string) {
+  if (!value) {
+    return true
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return false
+  }
+  return Date.now() - date.getTime() > 24 * 60 * 60 * 1000
 }
 
 function formatAmount(value?: number) {
@@ -349,6 +494,11 @@ onMounted(loadDashboard)
   box-shadow: 0 10px 30px rgb(31 41 55 / 5%);
 }
 
+.metric-card--danger {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
 .metric-card__meta {
   display: flex;
   align-items: center;
@@ -368,13 +518,14 @@ onMounted(loadDashboard)
 
 .metric-card__hint {
   margin: 12px 0 0;
-  color: #94a3b8;
+  color: #64748b;
   font-size: 12px;
+  line-height: 1.5;
 }
 
-.dashboard-overview {
+.dashboard-main {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
   gap: 16px;
   margin-bottom: 16px;
 }
@@ -386,58 +537,88 @@ onMounted(loadDashboard)
   margin-bottom: 16px;
 }
 
+.dashboard-layout--bottom {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.7fr);
+}
+
 .panel-card {
   min-width: 0;
 }
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+.issue-list,
+.rank-list,
+.group-overview,
+.task-list,
+.log-list {
+  min-height: 180px;
 }
 
-.summary-box {
-  border-radius: 8px;
-  background: #f8fafc;
-  padding: 14px;
-}
-
-.summary-box--blue {
-  background: #eef6ff;
-}
-
-.summary-box--green {
-  background: #ecfdf5;
-}
-
-.summary-box__label {
-  color: #64748b;
-  font-size: 12px;
-}
-
-.summary-box__value {
-  display: block;
-  margin-top: 10px;
-  color: #0f172a;
-  font-size: 22px;
-  font-weight: 700;
-}
-
-.summary-box__sub {
-  display: block;
-  margin-top: 6px;
-  color: #94a3b8;
-  font-size: 12px;
-}
-
+.issue-list,
+.rank-list,
+.task-list,
+.log-list,
 .group-overview {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 180px;
 }
 
-.group-overview__item {
+.issue-item {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 52px;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fffaf0;
+  padding: 12px;
+}
+
+.issue-item--danger {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.issue-item__badge {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 8px;
+  background: #f97316;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.issue-item--danger .issue-item__badge {
+  background: #dc2626;
+}
+
+.issue-item__body {
+  min-width: 0;
+}
+
+.issue-item__title {
+  overflow: hidden;
+  color: #0f172a;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.issue-item__desc {
+  overflow: hidden;
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rank-item,
+.group-overview__item,
+.task-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -448,11 +629,18 @@ onMounted(loadDashboard)
   padding: 12px;
 }
 
+.rank-item--balance {
+  background: #f8fafc;
+}
+
+.rank-item__main,
 .group-overview__main {
   min-width: 0;
 }
 
-.group-overview__name {
+.rank-item__name,
+.group-overview__name,
+.task-item__name {
   overflow: hidden;
   color: #0f172a;
   font-weight: 700;
@@ -460,42 +648,51 @@ onMounted(loadDashboard)
   white-space: nowrap;
 }
 
-.group-overview__sub {
+.rank-item__sub,
+.group-overview__sub,
+.task-item__cron {
   overflow: hidden;
-  margin-top: 4px;
+  margin-top: 5px;
   color: #64748b;
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.group-overview__rate {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  color: #64748b;
+.task-item__cron {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
+.rank-item__amount,
+.group-overview__rate {
+  display: flex;
+  min-width: 112px;
+  flex-direction: column;
+  align-items: flex-end;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.rank-item__amount strong,
 .group-overview__rate strong {
   color: #0f172a;
   font-size: 18px;
-}
-
-.platform-list,
-.task-list,
-.log-list {
-  min-height: 180px;
+  line-height: 1.2;
 }
 
 .platform-list {
   display: grid;
+  min-height: 180px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
 .platform-list :deep(.el-empty),
+.issue-list :deep(.el-empty),
+.rank-list :deep(.el-empty),
 .task-list :deep(.el-empty),
-.log-list :deep(.el-empty) {
+.log-list :deep(.el-empty),
+.group-overview :deep(.el-empty) {
   grid-column: 1 / -1;
 }
 
@@ -532,6 +729,7 @@ onMounted(loadDashboard)
 
 .platform-item__title-row {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 8px;
 }
@@ -574,41 +772,6 @@ onMounted(loadDashboard)
 
 .platform-item__amounts .warn {
   color: #b45309;
-}
-
-.task-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.task-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border: 1px solid #edf2f7;
-  border-radius: 8px;
-  background: #fbfdff;
-  padding: 12px;
-}
-
-.task-item__name {
-  color: #0f172a;
-  font-weight: 700;
-}
-
-.task-item__cron {
-  margin-top: 5px;
-  color: #64748b;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 12px;
-}
-
-.log-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 .log-item {
