@@ -31,7 +31,7 @@ const router = createRouter({
           path: 'balance-trend',
           name: 'balance-trend',
           component: BalanceTrendView,
-          meta: { title: '余额变化曲线' }
+          meta: { title: '余额查看' }
         },
         {
           path: 'accounts',

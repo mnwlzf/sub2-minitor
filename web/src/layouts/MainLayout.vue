@@ -25,7 +25,7 @@
         </el-menu-item>
         <el-menu-item index="/balance-trend">
           <el-icon><TrendCharts /></el-icon>
-          <span>余额变化曲线</span>
+          <span>余额查看</span>
         </el-menu-item>
         <el-menu-item index="/accounts">
           <el-icon><User /></el-icon>

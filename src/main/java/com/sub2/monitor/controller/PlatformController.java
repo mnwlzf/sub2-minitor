@@ -18,7 +18,6 @@ import com.sub2.monitor.scheduler.QuartzJobNames;
 import com.sub2.monitor.scheduler.executor.BalanceChannelCollectExecutor;
 import com.sub2.monitor.service.PlatformService;
 import com.sub2.monitor.service.TaskScheduleService;
-import org.quartz.CronExpression;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,7 +37,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -239,12 +237,12 @@ public class PlatformController {
         }
 
         String cronExpression = loadBalanceCollectionCron();
-        List<OffsetDateTime> cronTimes = buildCronTimes(cronExpression, Math.max(1, Math.min(limit, 200)));
+        int safeLimit = Math.max(1, Math.min(limit, 200));
         List<PlatformBalanceTrendResponse.AccountTrend> accountTrends = accountsMapper.selectList(new LambdaQueryWrapper<Accounts>()
                 .in(Accounts::getId, accountIds)
                 .orderByDesc(Accounts::getId))
                 .stream()
-                .map(account -> buildAccountTrend(account, cronTimes))
+                .map(account -> buildAccountTrend(account, safeLimit))
                 .toList();
 
         PlatformBalanceTrendResponse response = new PlatformBalanceTrendResponse();
@@ -344,68 +342,34 @@ public class PlatformController {
         return schedule == null ? "" : schedule.getCronExpression();
     }
 
-    private PlatformBalanceTrendResponse.AccountTrend buildAccountTrend(Accounts account, List<OffsetDateTime> cronTimes) {
+    private PlatformBalanceTrendResponse.AccountTrend buildAccountTrend(Accounts account, int limit) {
         PlatformBalanceTrendResponse.AccountTrend accountTrend = new PlatformBalanceTrendResponse.AccountTrend();
         accountTrend.setAccountId(account.getId());
         accountTrend.setUsername(account.getUsername());
-        accountTrend.setPoints(buildAccountTrendPoints(account.getId(), cronTimes));
+        accountTrend.setPoints(buildAccountTrendPoints(account.getId(), limit));
         return accountTrend;
     }
 
-    private List<PlatformBalanceTrendResponse.Point> buildAccountTrendPoints(Long accountId, List<OffsetDateTime> cronTimes) {
-        if (cronTimes.size() < 2) {
-            return List.of();
-        }
+    private List<PlatformBalanceTrendResponse.Point> buildAccountTrendPoints(Long accountId, int limit) {
         List<AccountBalanceHistory> histories = accountBalanceHistoryMapper.selectList(new LambdaQueryWrapper<AccountBalanceHistory>()
                 .eq(AccountBalanceHistory::getAccountId, accountId)
-                .ge(AccountBalanceHistory::getCreateTime, cronTimes.get(0))
-                .le(AccountBalanceHistory::getCreateTime, cronTimes.get(cronTimes.size() - 1))
-                .orderByAsc(AccountBalanceHistory::getCreateTime)
-                .orderByAsc(AccountBalanceHistory::getId));
-        List<PlatformBalanceTrendResponse.Point> points = new ArrayList<>();
-        for (int i = 1; i < cronTimes.size(); i++) {
-            OffsetDateTime slotStart = cronTimes.get(i - 1);
-            OffsetDateTime slotEnd = cronTimes.get(i);
-            Optional<AccountBalanceHistory> latestHistory = histories.stream()
-                    .filter(history -> history.getCreateTime() != null)
-                    .filter(history -> !history.getCreateTime().isBefore(slotStart) && !history.getCreateTime().isAfter(slotEnd))
-                    .max(Comparator.comparing(AccountBalanceHistory::getCreateTime)
-                            .thenComparing(AccountBalanceHistory::getId));
-            latestHistory.ifPresent(history -> {
-                PlatformBalanceTrendResponse.Point point = new PlatformBalanceTrendResponse.Point();
-                point.setTime(slotEnd.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
-                point.setBalance(history.getCurrentBalance().setScale(2, RoundingMode.HALF_UP));
-                points.add(point);
-            });
-        }
-        return points;
-    }
-
-    private List<OffsetDateTime> buildCronTimes(String cronExpression, int count) {
-        if (cronExpression == null || cronExpression.isBlank()) {
-            return List.of();
-        }
-        try {
-            CronExpression expression = new CronExpression(cronExpression);
-            OffsetDateTime now = OffsetDateTime.now();
-            List<OffsetDateTime> times = new ArrayList<>();
-            Date cursor = Date.from(now.minusDays(30).toInstant());
-            Date boundary = Date.from(now.toInstant());
-            while (times.size() < count + 1) {
-                Date next = expression.getNextValidTimeAfter(cursor);
-                if (next == null || next.after(boundary)) {
-                    break;
-                }
-                times.add(OffsetDateTime.ofInstant(next.toInstant(), ZoneId.systemDefault()));
-                cursor = next;
-            }
-            if (times.size() > count + 1) {
-                return times.subList(times.size() - count - 1, times.size());
-            }
-            return times;
-        } catch (Exception exception) {
-            return List.of();
-        }
+                .orderByDesc(AccountBalanceHistory::getCreateTime)
+                .orderByDesc(AccountBalanceHistory::getId)
+                .last("limit " + limit));
+        return histories.stream()
+                .sorted(Comparator.comparing(AccountBalanceHistory::getCreateTime)
+                        .thenComparing(AccountBalanceHistory::getId))
+                .map(history -> {
+                    PlatformBalanceTrendResponse.Point point = new PlatformBalanceTrendResponse.Point();
+                    point.setTime(history.getCreateTime() == null
+                            ? null
+                            : history.getCreateTime().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+                    point.setBalance(Optional.ofNullable(history.getCurrentBalance())
+                            .orElse(BigDecimal.ZERO)
+                            .setScale(2, RoundingMode.HALF_UP));
+                    return point;
+                })
+                .toList();
     }
 
     private Map<Long, BigDecimal> yesterdayBalanceMap(List<Long> accountIds, LocalDate today) {
