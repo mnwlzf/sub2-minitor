@@ -7,6 +7,8 @@ public interface QuartzJobService {
 
     void scheduleBalanceCollection(String cronExpression);
 
+    void scheduleDailyDataSummary(String cronExpression);
+
     void triggerNow(String taskKey, String taskGroup);
 
     void pause(String taskKey, String taskGroup);

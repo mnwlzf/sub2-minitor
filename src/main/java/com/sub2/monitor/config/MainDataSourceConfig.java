@@ -2,6 +2,7 @@ package com.sub2.monitor.config;
 
 import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.sub2.monitor.config.datasource.DataSourceKey;
 import com.sub2.monitor.config.datasource.DynamicRoutingDataSource;
 import com.zaxxer.hikari.HikariDataSource;
@@ -90,12 +91,14 @@ public class MainDataSourceConfig {
      */
     @Bean
     @Primary
-    public SqlSessionFactory sqlSessionFactory(@Qualifier("dataSource") DataSource dataSource) throws Exception {
+    public SqlSessionFactory sqlSessionFactory(@Qualifier("dataSource") DataSource dataSource,
+                                               MybatisPlusInterceptor mybatisPlusInterceptor) throws Exception {
         MybatisSqlSessionFactoryBean factoryBean = new MybatisSqlSessionFactoryBean();
         factoryBean.setDataSource(dataSource);
         MybatisConfiguration configuration = new MybatisConfiguration();
         configuration.setLogImpl(Slf4jImpl.class);
         factoryBean.setConfiguration(configuration);
+        factoryBean.setPlugins(mybatisPlusInterceptor);
         factoryBean.setMapperLocations(new PathMatchingResourcePatternResolver()
                 .getResources("classpath*:mapper/**/*.xml"));
         return factoryBean.getObject();

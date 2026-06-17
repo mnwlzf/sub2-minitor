@@ -236,3 +236,110 @@ export function runBalanceCollectionNow() {
 export function listBalanceCollectionLogs(params: { pageNo?: number; pageSize?: number }) {
   return http.get('/tasks/balance-collection/logs', { params })
 }
+
+export function listTaskLogs(params: { pageNo?: number; pageSize?: number; taskKey?: string }) {
+  return http.get('/tasks/logs', { params })
+}
+
+export interface MailSmtpConfig {
+  id?: Id
+  configName?: string
+  host: string
+  port: number
+  username: string
+  password?: string
+  passwordConfigured?: boolean
+  fromEmail: string
+  fromName?: string
+  useTls: boolean
+  useSsl: boolean
+  isEnabled: boolean
+  isDefault?: boolean
+}
+
+export interface MailRecipient {
+  id: Id
+  email: string
+  name?: string
+  isEnabled: boolean
+  createTime?: string
+  updateTime?: string
+}
+
+export interface MailSceneRecipient {
+  relationId: Id
+  recipientId: Id
+  email: string
+  name?: string
+  isEnabled: boolean
+  recipientType: 'TO' | 'CC' | 'BCC'
+}
+
+export interface MailScene {
+  id: Id
+  sceneKey: string
+  sceneName: string
+  description?: string
+  isEnabled: boolean
+  recipients: MailSceneRecipient[]
+}
+
+export interface MailScenePayload {
+  id?: Id
+  sceneKey: string
+  sceneName: string
+  description?: string
+  isEnabled: boolean
+}
+
+export function getMailSmtpConfig() {
+  return http.get('/mail-settings/smtp')
+}
+
+export function saveMailSmtpConfig(data: MailSmtpConfig) {
+  return http.put('/mail-settings/smtp', data)
+}
+
+export function testMailSmtpConfig(data: MailSmtpConfig) {
+  return http.post('/mail-settings/smtp/test', data)
+}
+
+export function listMailRecipients() {
+  return http.get('/mail-settings/recipients')
+}
+
+export function saveMailRecipient(data: Omit<MailRecipient, 'id'>) {
+  return http.post('/mail-settings/recipients', data)
+}
+
+export function updateMailRecipient(data: MailRecipient) {
+  return http.put('/mail-settings/recipients', data)
+}
+
+export function deleteMailRecipient(id: Id) {
+  return http.delete(`/mail-settings/recipients/${id}`)
+}
+
+export function listMailScenes() {
+  return http.get('/mail-settings/scenes')
+}
+
+export function saveMailScene(data: MailScenePayload) {
+  return http.post('/mail-settings/scenes', data)
+}
+
+export function updateMailScene(data: MailScenePayload) {
+  return http.put('/mail-settings/scenes', data)
+}
+
+export function deleteMailScene(id: Id) {
+  return http.delete(`/mail-settings/scenes/${id}`)
+}
+
+export function addMailSceneRecipient(data: { sceneKey: string; recipientId: Id; recipientType: 'TO' | 'CC' | 'BCC' }) {
+  return http.post('/mail-settings/scenes/recipients', data)
+}
+
+export function removeMailSceneRecipient(relationId: Id) {
+  return http.delete(`/mail-settings/scenes/recipients/${relationId}`)
+}

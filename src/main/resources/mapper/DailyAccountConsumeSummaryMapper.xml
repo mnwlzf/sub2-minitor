@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sub2.monitor.mapper.DailyAccountConsumeSummaryMapper">
+
+    <select id="selectSummaryRows" resultType="com.sub2.monitor.dto.DailyAccountConsumeSummaryRow">
+        with ranked_history as (
+            select
+                h.account_id,
+                h.platform_id,
+                h.current_balance,
+                h.create_time,
+                row_number() over (partition by h.account_id order by h.create_time asc, h.id asc) as first_rank,
+                row_number() over (partition by h.account_id order by h.create_time desc, h.id desc) as last_rank
+            from account_balance_history h
+            where h.create_time &gt;= #{startTime}
+              and h.create_time &lt; #{endTime}
+        ),
+        first_history as (
+            select account_id, platform_id, current_balance, create_time
+            from ranked_history
+            where first_rank = 1
+        ),
+        last_history as (
+            select account_id, platform_id, current_balance, create_time
+            from ranked_history
+            where last_rank = 1
+        )
+        select
+            cast(#{startTime} as date) as summary_date,
+            p.id as platform_id,
+            p.name as platform_name,
+            a.id as account_id,
+            a.username as username,
+            f.current_balance as start_balance,
+            l.current_balance as end_balance,
+            (f.current_balance - l.current_balance) as platform_consume_amount,
+            ((f.current_balance - l.current_balance) *
+                case
+                    when p.received_amount is null or p.received_amount &lt;= 0 then 1
+                    else p.recharge_amount / p.received_amount
+                end
+            ) as actual_consume_amount,
+            f.create_time as first_balance_time,
+            l.create_time as last_balance_time
+        from first_history f
+        join last_history l on l.account_id = f.account_id
+        join accounts a on a.id = f.account_id
+        join platform p on p.id = f.platform_id
+        order by p.id asc, a.id asc
+    </select>
+
+    <insert id="upsertBatch">
+        insert into daily_account_consume_summary
+            (summary_date, platform_id, platform_name, account_id, username,
+             start_balance, end_balance, platform_consume_amount, actual_consume_amount, first_balance_time, last_balance_time,
+             create_time, update_time)
+        values
+        <foreach collection="rows" item="row" separator=",">
+            (#{row.summaryDate}, #{row.platformId}, #{row.platformName}, #{row.accountId}, #{row.username},
+             #{row.startBalance}, #{row.endBalance}, #{row.platformConsumeAmount}, #{row.actualConsumeAmount}, #{row.firstBalanceTime}, #{row.lastBalanceTime},
+             now(), now())
+        </foreach>
+        on conflict (summary_date, account_id) do update set
+            platform_id = excluded.platform_id,
+            platform_name = excluded.platform_name,
+            username = excluded.username,
+            start_balance = excluded.start_balance,
+            end_balance = excluded.end_balance,
+            platform_consume_amount = excluded.platform_consume_amount,
+            actual_consume_amount = excluded.actual_consume_amount,
+            first_balance_time = excluded.first_balance_time,
+            last_balance_time = excluded.last_balance_time,
+            update_time = now()
+    </insert>
+</mapper>

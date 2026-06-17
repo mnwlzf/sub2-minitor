@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.util.TimeZone;
 
 @Service
 @Slf4j
@@ -56,7 +57,8 @@ public class QuartzJobServiceImpl implements QuartzJobService {
             CronTrigger trigger = TriggerBuilder.newTrigger()
                     .withIdentity(triggerKey)
                     .forJob(jobKey)
-                    .withSchedule(CronScheduleBuilder.cronSchedule(taskDefinition.getCronExpression()))
+                    .withSchedule(CronScheduleBuilder.cronSchedule(taskDefinition.getCronExpression())
+                            .inTimeZone(TimeZone.getTimeZone(QuartzJobNames.BEIJING_TIME_ZONE)))
                     .build();
 
             if (scheduler.checkExists(jobKey)) {
@@ -83,6 +85,19 @@ public class QuartzJobServiceImpl implements QuartzJobService {
                 .jobClassName(QuartzJobNames.BALANCE_CHANNEL_COLLECT_JOB_CLASS)
                 .cronExpression(cronExpression)
                 .description("定时采集余额与渠道")
+                .build();
+        schedule(taskDefinition);
+    }
+
+    @Override
+    public void scheduleDailyDataSummary(String cronExpression) {
+        TaskDefinition taskDefinition = TaskDefinition.builder()
+                .taskKey(QuartzJobNames.DAILY_DATA_SUMMARY_TASK_KEY)
+                .taskName(QuartzJobNames.DAILY_DATA_SUMMARY_TASK_NAME)
+                .taskGroup(QuartzJobNames.DAILY_DATA_SUMMARY_TASK_GROUP)
+                .jobClassName(QuartzJobNames.DAILY_DATA_SUMMARY_JOB_CLASS)
+                .cronExpression(cronExpression)
+                .description("每天北京时间 00:00 汇总前一天每个平台每个账号的余额消耗")
                 .build();
         schedule(taskDefinition);
     }

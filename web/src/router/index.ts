@@ -7,6 +7,7 @@ import BalanceTrendView from '@/views/BalanceTrendView.vue'
 import PlatformGroupView from '@/views/PlatformGroupView.vue'
 import SchedulerEditView from '@/views/SchedulerEditView.vue'
 import SchedulerLogView from '@/views/SchedulerLogView.vue'
+import MailSettingsView from '@/views/MailSettingsView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -44,6 +45,12 @@ const router = createRouter({
           name: 'groups',
           component: PlatformGroupView,
           meta: { title: '分组查看' }
+        },
+        {
+          path: 'mail-settings',
+          name: 'mail-settings',
+          component: MailSettingsView,
+          meta: { title: '邮件设置' }
         },
         {
           path: 'scheduler/edit',

@@ -143,6 +143,46 @@ public class TaskScheduleController {
         return ApiResponse.success(null);
     }
 
+    @PostMapping("/daily-data-summary/init")
+    public ApiResponse<Void> initDailyDataSummary(@RequestBody TaskScheduleRequest request) {
+        TaskDefinition taskDefinition = TaskDefinition.builder()
+                .taskKey(QuartzJobNames.DAILY_DATA_SUMMARY_TASK_KEY)
+                .taskName(QuartzJobNames.DAILY_DATA_SUMMARY_TASK_NAME)
+                .taskGroup(QuartzJobNames.DAILY_DATA_SUMMARY_TASK_GROUP)
+                .jobClassName(QuartzJobNames.DAILY_DATA_SUMMARY_JOB_CLASS)
+                .cronExpression(request.getCronExpression())
+                .description(request.getDescription())
+                .build();
+
+        TaskSchedule schedule = taskScheduleService.getOne(new LambdaQueryWrapper<TaskSchedule>()
+                .eq(TaskSchedule::getTaskKey, QuartzJobNames.DAILY_DATA_SUMMARY_TASK_KEY));
+        if (schedule == null) {
+            schedule = new TaskSchedule();
+            schedule.setTaskKey(QuartzJobNames.DAILY_DATA_SUMMARY_TASK_KEY);
+            schedule.setTaskName(QuartzJobNames.DAILY_DATA_SUMMARY_TASK_NAME);
+            schedule.setTaskGroup(QuartzJobNames.DAILY_DATA_SUMMARY_TASK_GROUP);
+            schedule.setCronExpression(request.getCronExpression());
+            schedule.setJobClass(QuartzJobNames.DAILY_DATA_SUMMARY_JOB_CLASS);
+            schedule.setDescription(request.getDescription());
+            schedule.setIsEnabled(true);
+            schedule.setCreateTime(OffsetDateTime.now());
+            schedule.setUpdateTime(OffsetDateTime.now());
+            taskScheduleService.save(schedule);
+        } else {
+            schedule.setTaskName(QuartzJobNames.DAILY_DATA_SUMMARY_TASK_NAME);
+            schedule.setTaskGroup(QuartzJobNames.DAILY_DATA_SUMMARY_TASK_GROUP);
+            schedule.setCronExpression(request.getCronExpression());
+            schedule.setJobClass(QuartzJobNames.DAILY_DATA_SUMMARY_JOB_CLASS);
+            schedule.setDescription(request.getDescription());
+            schedule.setIsEnabled(true);
+            schedule.setUpdateTime(OffsetDateTime.now());
+            taskScheduleService.updateById(schedule);
+        }
+
+        quartzTaskFacade.startDailyDataSummary(taskDefinition.getCronExpression());
+        return ApiResponse.success(null);
+    }
+
     @PutMapping
     public ApiResponse<Void> update(@RequestBody TaskScheduleRequest request) {
         TaskSchedule schedule = taskScheduleService.getOne(new LambdaQueryWrapper<TaskSchedule>()
@@ -239,6 +279,24 @@ public class TaskScheduleController {
                 new LambdaQueryWrapper<TaskExecutionLog>()
                         .eq(TaskExecutionLog::getTaskKey, QuartzJobNames.BALANCE_CHANNEL_COLLECT_TASK_KEY)
                         .orderByDesc(TaskExecutionLog::getCreateTime));
+        PageResponse<TaskExecutionLog> response = new PageResponse<>();
+        response.setTotal(page.getTotal());
+        response.setPageNo(pageNo);
+        response.setPageSize(pageSize);
+        response.setRecords(page.getRecords());
+        return ApiResponse.success(response);
+    }
+
+    @GetMapping("/logs")
+    public ApiResponse<PageResponse<TaskExecutionLog>> logs(@RequestParam(defaultValue = "1") long pageNo,
+                                                            @RequestParam(defaultValue = "20") long pageSize,
+                                                            @RequestParam(required = false) String taskKey) {
+        LambdaQueryWrapper<TaskExecutionLog> wrapper = new LambdaQueryWrapper<TaskExecutionLog>()
+                .orderByDesc(TaskExecutionLog::getCreateTime);
+        if (taskKey != null && !taskKey.isBlank()) {
+            wrapper.eq(TaskExecutionLog::getTaskKey, taskKey);
+        }
+        Page<TaskExecutionLog> page = taskExecutionLogService.page(new Page<>(pageNo, pageSize), wrapper);
         PageResponse<TaskExecutionLog> response = new PageResponse<>();
         response.setTotal(page.getTotal());
         response.setPageNo(pageNo);

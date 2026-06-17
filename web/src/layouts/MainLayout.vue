@@ -35,6 +35,10 @@
           <el-icon><Collection /></el-icon>
           <span>分组查看</span>
         </el-menu-item>
+        <el-menu-item index="/mail-settings">
+          <el-icon><Message /></el-icon>
+          <span>邮件设置</span>
+        </el-menu-item>
         <el-sub-menu index="/scheduler">
           <template #title>
             <el-icon><Calendar /></el-icon>
@@ -65,7 +69,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { Calendar, Collection, DataBoard, Grid, TrendCharts, User } from '@element-plus/icons-vue'
+import { Calendar, Collection, DataBoard, Grid, Message, TrendCharts, User } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const activePath = computed(() => route.path)

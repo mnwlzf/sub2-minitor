@@ -16,6 +16,10 @@ public class QuartzTaskFacade {
         quartzJobService.scheduleBalanceCollection(cronExpression);
     }
 
+    public void startDailyDataSummary(String cronExpression) {
+        quartzJobService.scheduleDailyDataSummary(cronExpression);
+    }
+
     public void scheduleTask(TaskDefinition taskDefinition) {
         quartzJobService.schedule(taskDefinition);
     }
