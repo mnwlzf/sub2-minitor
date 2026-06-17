@@ -57,9 +57,19 @@
 
           <section class="group-list">
             <el-empty v-if="platform.groups.length === 0" description="暂无分组" />
-            <article v-for="group in platform.groups" :key="group.groupName" class="group-item">
+            <article
+              v-for="group in platform.groups"
+              :key="group.groupName"
+              class="group-item"
+              :class="{ 'group-item--key': group.keyGroup }"
+            >
               <div class="group-item__main">
-                <div class="group-item__name">{{ group.groupName }}</div>
+                <div class="group-item__name">
+                  {{ group.groupName }}
+                  <el-tag v-if="group.keyGroup" type="warning" effect="light" size="small">
+                    密钥 {{ group.keyCount || 0 }}
+                  </el-tag>
+                </div>
                 <div class="group-item__time">{{ formatDateTime(group.collectTime) }}</div>
               </div>
               <div class="group-item__rates">
@@ -314,12 +324,20 @@ onMounted(reload)
   padding: 12px;
 }
 
+.group-item--key {
+  border-color: #facc15;
+  background: #fffbeb;
+}
+
 .group-item__main {
   min-width: 0;
 }
 
 .group-item__name {
+  display: flex;
   overflow: hidden;
+  align-items: center;
+  gap: 6px;
   color: #0f172a;
   font-size: 13px;
   font-weight: 700;

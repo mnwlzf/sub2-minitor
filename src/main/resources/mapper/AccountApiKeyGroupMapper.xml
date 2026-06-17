@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sub2.monitor.mapper.AccountApiKeyGroupMapper">
+    <insert id="upsertBatch">
+        insert into account_api_key_group
+            (platform_id, account_id, username, platform_type, remote_key_id, key_name, key_status,
+             group_name, current_rate, actual_rate, today_actual_cost, total_actual_cost,
+             used_amount, remain_amount, collect_time, create_time, update_time)
+        values
+        <foreach collection="items" item="item" separator=",">
+            (#{item.platformId}, #{item.accountId}, #{item.username}, #{item.platformType}, #{item.remoteKeyId},
+             #{item.keyName}, #{item.keyStatus}, #{item.groupName}, #{item.currentRate}, #{item.actualRate},
+             #{item.todayActualCost}, #{item.totalActualCost}, #{item.usedAmount}, #{item.remainAmount},
+             #{item.collectTime}, #{item.createTime}, #{item.updateTime})
+        </foreach>
+        on conflict (platform_id, account_id, remote_key_id) do update
+        set username = excluded.username,
+            platform_type = excluded.platform_type,
+            key_name = excluded.key_name,
+            key_status = excluded.key_status,
+            group_name = excluded.group_name,
+            current_rate = excluded.current_rate,
+            actual_rate = excluded.actual_rate,
+            today_actual_cost = excluded.today_actual_cost,
+            total_actual_cost = excluded.total_actual_cost,
+            used_amount = excluded.used_amount,
+            remain_amount = excluded.remain_amount,
+            collect_time = excluded.collect_time,
+            update_time = excluded.update_time
+    </insert>
+</mapper>

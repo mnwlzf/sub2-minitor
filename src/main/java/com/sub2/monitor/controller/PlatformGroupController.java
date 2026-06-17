@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sub2.monitor.common.api.ApiResponse;
 import com.sub2.monitor.common.api.PageResponse;
 import com.sub2.monitor.dto.PlatformGroupSummaryResponse;
+import com.sub2.monitor.entity.AccountApiKeyGroup;
 import com.sub2.monitor.entity.Platform;
 import com.sub2.monitor.entity.PlatformRateHistory;
+import com.sub2.monitor.mapper.AccountApiKeyGroupMapper;
 import com.sub2.monitor.service.PlatformRateHistoryService;
 import com.sub2.monitor.service.PlatformService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,11 +31,14 @@ public class PlatformGroupController {
 
     private final PlatformService platformService;
     private final PlatformRateHistoryService platformRateHistoryService;
+    private final AccountApiKeyGroupMapper accountApiKeyGroupMapper;
 
     public PlatformGroupController(PlatformService platformService,
-                                   PlatformRateHistoryService platformRateHistoryService) {
+                                   PlatformRateHistoryService platformRateHistoryService,
+                                   AccountApiKeyGroupMapper accountApiKeyGroupMapper) {
         this.platformService = platformService;
         this.platformRateHistoryService = platformRateHistoryService;
+        this.accountApiKeyGroupMapper = accountApiKeyGroupMapper;
     }
 
     @GetMapping
@@ -45,6 +50,7 @@ public class PlatformGroupController {
         List<Platform> platforms = page.getRecords();
         List<Long> platformIds = platforms.stream().map(Platform::getId).toList();
         Map<Long, List<PlatformRateHistory>> latestGroupMap = latestGroupMap(platformIds);
+        Map<Long, Map<String, Long>> keyGroupCountMap = keyGroupCountMap(platformIds);
 
         PageResponse<PlatformGroupSummaryResponse> response = new PageResponse<>();
         response.setTotal(page.getTotal());
@@ -52,6 +58,7 @@ public class PlatformGroupController {
         response.setPageSize(pageSize);
         response.setRecords(platforms.stream()
                 .map(platform -> toResponse(platform, latestGroupMap.getOrDefault(platform.getId(), List.of())))
+                .map(item -> markKeyGroups(item, keyGroupCountMap.getOrDefault(item.getPlatformId(), Map.of())))
                 .toList());
         return ApiResponse.success(response);
     }
@@ -109,7 +116,30 @@ public class PlatformGroupController {
         groupRate.setCurrentRate(history.getCurrentRate());
         groupRate.setActualRate(history.getCurrentRate().multiply(toDeductRate(platform)).setScale(4, RoundingMode.HALF_UP));
         groupRate.setCollectTime(history.getCreateTime());
+        groupRate.setKeyGroup(false);
+        groupRate.setKeyCount(0L);
         return groupRate;
+    }
+
+    private Map<Long, Map<String, Long>> keyGroupCountMap(List<Long> platformIds) {
+        if (platformIds.isEmpty()) {
+            return Map.of();
+        }
+        return accountApiKeyGroupMapper.selectList(new LambdaQueryWrapper<AccountApiKeyGroup>()
+                        .in(AccountApiKeyGroup::getPlatformId, platformIds)
+                        .isNotNull(AccountApiKeyGroup::getGroupName))
+                .stream()
+                .collect(Collectors.groupingBy(AccountApiKeyGroup::getPlatformId,
+                        Collectors.groupingBy(AccountApiKeyGroup::getGroupName, Collectors.counting())));
+    }
+
+    private PlatformGroupSummaryResponse markKeyGroups(PlatformGroupSummaryResponse response, Map<String, Long> keyGroupCountMap) {
+        response.getGroups().forEach(group -> {
+            long keyCount = keyGroupCountMap.getOrDefault(group.getGroupName(), 0L);
+            group.setKeyGroup(keyCount > 0);
+            group.setKeyCount(keyCount);
+        });
+        return response;
     }
 
     private BigDecimal toDeductRate(Platform platform) {

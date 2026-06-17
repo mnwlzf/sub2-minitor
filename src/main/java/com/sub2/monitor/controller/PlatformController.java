@@ -7,10 +7,12 @@ import com.sub2.monitor.common.api.PageResponse;
 import com.sub2.monitor.dto.PlatformBalanceTrendResponse;
 import com.sub2.monitor.dto.PlatformSummaryResponse;
 import com.sub2.monitor.entity.AccountBalanceHistory;
+import com.sub2.monitor.entity.AccountApiKeyGroup;
 import com.sub2.monitor.entity.Accounts;
 import com.sub2.monitor.entity.Platform;
 import com.sub2.monitor.entity.PlatformRateHistory;
 import com.sub2.monitor.entity.TaskSchedule;
+import com.sub2.monitor.mapper.AccountApiKeyGroupMapper;
 import com.sub2.monitor.mapper.AccountBalanceHistoryMapper;
 import com.sub2.monitor.mapper.AccountsMapper;
 import com.sub2.monitor.mapper.PlatformRateHistoryMapper;
@@ -49,6 +51,7 @@ public class PlatformController {
 
     private final PlatformService platformService;
     private final AccountsMapper accountsMapper;
+    private final AccountApiKeyGroupMapper accountApiKeyGroupMapper;
     private final AccountBalanceHistoryMapper accountBalanceHistoryMapper;
     private final PlatformRateHistoryMapper platformRateHistoryMapper;
     private final BalanceChannelCollectExecutor balanceChannelCollectExecutor;
@@ -56,12 +59,14 @@ public class PlatformController {
 
     public PlatformController(PlatformService platformService,
                               AccountsMapper accountsMapper,
+                              AccountApiKeyGroupMapper accountApiKeyGroupMapper,
                               AccountBalanceHistoryMapper accountBalanceHistoryMapper,
                               PlatformRateHistoryMapper platformRateHistoryMapper,
                               BalanceChannelCollectExecutor balanceChannelCollectExecutor,
                               TaskScheduleService taskScheduleService) {
         this.platformService = platformService;
         this.accountsMapper = accountsMapper;
+        this.accountApiKeyGroupMapper = accountApiKeyGroupMapper;
         this.accountBalanceHistoryMapper = accountBalanceHistoryMapper;
         this.platformRateHistoryMapper = platformRateHistoryMapper;
         this.balanceChannelCollectExecutor = balanceChannelCollectExecutor;
@@ -132,6 +137,7 @@ public class PlatformController {
             List<Long> accountIds = accounts.stream().map(Accounts::getId).toList();
             Map<Long, AccountBalanceHistory> latestBalanceHistoryMap = latestBalanceHistoryMap(accountIds);
             Map<Long, BigDecimal> yesterdayBalanceMap = yesterdayBalanceMap(accountIds, today);
+            Map<Long, List<AccountApiKeyGroup>> keyGroupMap = latestKeyGroupMap(accountIds);
 
             List<PlatformSummaryResponse.AccountSummary> accountSummaries = new ArrayList<>();
             BigDecimal totalBalance = BigDecimal.ZERO;
@@ -149,6 +155,9 @@ public class PlatformController {
                 accountSummary.setTodayConsume(todayConsume);
                 accountSummary.setActualConsume(toActualConsume(todayConsume, platform).setScale(2, RoundingMode.HALF_UP));
                 accountSummary.setLastCollectTime(latestHistory == null ? null : latestHistory.getCreateTime());
+                accountSummary.setKeyGroups(keyGroupMap.getOrDefault(account.getId(), List.of()).stream()
+                        .map(this::toApiKeyGroup)
+                        .toList());
                 accountSummaries.add(accountSummary);
                 totalBalance = totalBalance.add(latestBalance);
                 totalTodayConsume = totalTodayConsume.add(todayConsume);
@@ -283,6 +292,33 @@ public class PlatformController {
                 .collect(Collectors.toMap(AccountBalanceHistory::getAccountId,
                         history -> history,
                         (oldValue, ignored) -> oldValue));
+    }
+
+    private Map<Long, List<AccountApiKeyGroup>> latestKeyGroupMap(List<Long> accountIds) {
+        if (accountIds.isEmpty()) {
+            return Map.of();
+        }
+        return accountApiKeyGroupMapper.selectList(new LambdaQueryWrapper<AccountApiKeyGroup>()
+                        .in(AccountApiKeyGroup::getAccountId, accountIds)
+                        .orderByAsc(AccountApiKeyGroup::getGroupName)
+                        .orderByAsc(AccountApiKeyGroup::getKeyName))
+                .stream()
+                .collect(Collectors.groupingBy(AccountApiKeyGroup::getAccountId));
+    }
+
+    private PlatformSummaryResponse.ApiKeyGroup toApiKeyGroup(AccountApiKeyGroup item) {
+        PlatformSummaryResponse.ApiKeyGroup response = new PlatformSummaryResponse.ApiKeyGroup();
+        response.setKeyName(item.getKeyName());
+        response.setKeyStatus(item.getKeyStatus());
+        response.setGroupName(item.getGroupName());
+        response.setCurrentRate(item.getCurrentRate());
+        response.setActualRate(item.getActualRate());
+        response.setTodayActualCost(item.getTodayActualCost());
+        response.setTotalActualCost(item.getTotalActualCost());
+        response.setUsedAmount(item.getUsedAmount());
+        response.setRemainAmount(item.getRemainAmount());
+        response.setCollectTime(item.getCollectTime());
+        return response;
     }
 
     private Map<Long, OffsetDateTime> lastBalanceCollectMap(List<Long> platformIds) {

@@ -1,6 +1,7 @@
 package com.sub2.monitor.strategy.newapi;
 
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -14,10 +15,12 @@ import com.sub2.monitor.dto.newapi.NewApiLoginResponse;
 import com.sub2.monitor.dto.newapi.NewApiRequest;
 import com.sub2.monitor.dto.newapi.NewApiResponse;
 import com.sub2.monitor.dto.sub2api.Sub2ApiAccountProxy;
+import com.sub2.monitor.entity.AccountApiKeyGroup;
 import com.sub2.monitor.entity.AccountBalanceHistory;
 import com.sub2.monitor.entity.Accounts;
 import com.sub2.monitor.entity.Platform;
 import com.sub2.monitor.entity.PlatformRateHistory;
+import com.sub2.monitor.mapper.AccountApiKeyGroupMapper;
 import com.sub2.monitor.mapper.AccountBalanceHistoryMapper;
 import com.sub2.monitor.mapper.AccountsMapper;
 import com.sub2.monitor.mapper.PlatformMapper;
@@ -60,6 +63,9 @@ public class NewApiStrategy extends AbstractApiStrategy<NewApiRequest, NewApiRes
     private AccountsMapper accountsMapper;
 
     @Autowired
+    private AccountApiKeyGroupMapper accountApiKeyGroupMapper;
+
+    @Autowired
     private AccountBalanceHistoryMapper accountBalanceHistoryMapper;
 
     @Autowired
@@ -89,6 +95,7 @@ public class NewApiStrategy extends AbstractApiStrategy<NewApiRequest, NewApiRes
         login(request, context, proxyConfigMap);
         collectBalance(request, context, proxyConfigMap);
         NewApiResponse channelResponse = collectChannels(request, context, proxyConfigMap);
+        collectApiKeyGroups(request, context, proxyConfigMap, channelResponse.getChannelResults());
         NewApiResponse modelResponse = testModelAvailabilityByAccounts(request, context, proxyConfigMap);
 
         // 【4】聚合渠道和模型结果，作为本次完整采集的响应。
@@ -104,6 +111,118 @@ public class NewApiStrategy extends AbstractApiStrategy<NewApiRequest, NewApiRes
                 channelResponse.getChannelResults().size(),
                 modelResponse.getAccountResults().size());
         return response;
+    }
+
+    private void collectApiKeyGroups(NewApiRequest request,
+                                     TaskContext context,
+                                     Map<String, HttpsClient.ProxyConfig> proxyConfigMap,
+                                     List<NewApiResponse.ChannelResult> channelResults) {
+        Map<String, BigDecimal> rateMap = toChannelRateMap(channelResults);
+        Map<String, Long> accountIdMap = loadAccountIdMap(context.accounts(), context.platform().getId());
+        List<AccountApiKeyGroup> keyGroups = new ArrayList<>();
+        OffsetDateTime collectTime = OffsetDateTime.now();
+
+        for (AccountCredential account : context.accounts()) {
+            Long accountId = accountIdMap.get(account.userName());
+            if (accountId == null) {
+                log.warn("本地无此账号，跳过 NewApi 密钥分组采集: {}", logContext(context, account.userName()));
+                continue;
+            }
+            keyGroups.addAll(fetchNewApiKeyGroups(request, context, account, accountId, rateMap, proxyConfigMap, collectTime));
+        }
+
+        if (!keyGroups.isEmpty()) {
+            accountApiKeyGroupMapper.upsertBatch(keyGroups);
+            log.info("NewApi 密钥分组已保存, platformId={}, count={}", context.platform().getId(), keyGroups.size());
+        }
+    }
+
+    private List<AccountApiKeyGroup> fetchNewApiKeyGroups(NewApiRequest request,
+                                                          TaskContext context,
+                                                          AccountCredential account,
+                                                          Long accountId,
+                                                          Map<String, BigDecimal> rateMap,
+                                                          Map<String, HttpsClient.ProxyConfig> proxyConfigMap,
+                                                          OffsetDateTime collectTime) {
+        List<AccountApiKeyGroup> result = new ArrayList<>();
+        int page = 1;
+        int pageSize = 100;
+        while (true) {
+            String url = buildUrl(request.getBaseUrl(), "/api/token/?p=" + page + "&size=" + pageSize);
+            String responseBody = getBody(url,
+                    mergeHeaders(request.getBaseUrl(), account.userName(), request.getApiKey()),
+                    proxyConfigMap.get(account.userName()));
+            JSONObject root = JSONUtil.parseObj(responseBody);
+            JSONObject data = root.getJSONObject("data");
+            if (data == null) {
+                break;
+            }
+            JSONArray items = data.getJSONArray("items");
+            if (items == null || items.isEmpty()) {
+                break;
+            }
+            for (Object itemObj : items) {
+                JSONObject item = JSONUtil.parseObj(itemObj);
+                String groupName = item.getStr("group");
+                BigDecimal currentRate = rateMap.getOrDefault(groupName, BigDecimal.ZERO);
+                AccountApiKeyGroup keyGroup = baseKeyGroup(context, account, accountId, String.valueOf(item.getLong("id")), groupName, currentRate, collectTime);
+                keyGroup.setKeyName(item.getStr("name"));
+                keyGroup.setKeyStatus(String.valueOf(item.getInt("status", 0)));
+                keyGroup.setUsedAmount(toBalanceAmount(item.getBigDecimal("used_quota")));
+                keyGroup.setRemainAmount(toBalanceAmount(item.getBigDecimal("remain_quota")));
+                result.add(keyGroup);
+            }
+            Integer total = data.getInt("total");
+            if (total == null || page * pageSize >= total) {
+                break;
+            }
+            page++;
+        }
+        return result;
+    }
+
+    private Map<String, BigDecimal> toChannelRateMap(List<NewApiResponse.ChannelResult> channelResults) {
+        if (channelResults == null || channelResults.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, BigDecimal> rateMap = new LinkedHashMap<>();
+        for (NewApiResponse.ChannelResult result : channelResults) {
+            if (StrUtil.isBlank(result.getGroupName())) {
+                continue;
+            }
+            rateMap.putIfAbsent(result.getGroupName(), BigDecimal.valueOf(result.getRatio() == null ? 0D : result.getRatio()));
+        }
+        return rateMap;
+    }
+
+    private AccountApiKeyGroup baseKeyGroup(TaskContext context,
+                                            AccountCredential account,
+                                            Long accountId,
+                                            String remoteKeyId,
+                                            String groupName,
+                                            BigDecimal currentRate,
+                                            OffsetDateTime collectTime) {
+        OffsetDateTime now = OffsetDateTime.now();
+        AccountApiKeyGroup keyGroup = new AccountApiKeyGroup();
+        keyGroup.setPlatformId(context.platform().getId());
+        keyGroup.setAccountId(accountId);
+        keyGroup.setUsername(account.userName());
+        keyGroup.setPlatformType(context.platform().getType());
+        keyGroup.setRemoteKeyId(remoteKeyId);
+        keyGroup.setGroupName(groupName);
+        keyGroup.setCurrentRate(currentRate);
+        keyGroup.setActualRate(currentRate.multiply(toDeductRate(context.platform())).setScale(8, RoundingMode.HALF_UP));
+        keyGroup.setCollectTime(collectTime);
+        keyGroup.setCreateTime(now);
+        keyGroup.setUpdateTime(now);
+        return keyGroup;
+    }
+
+    private BigDecimal toBalanceAmount(BigDecimal quota) {
+        if (quota == null) {
+            return null;
+        }
+        return quota.divide(QUOTA_TO_BALANCE_DIVISOR, 8, RoundingMode.HALF_UP);
     }
 
 
@@ -333,6 +452,27 @@ public class NewApiStrategy extends AbstractApiStrategy<NewApiRequest, NewApiRes
         );
 
         return toProxyConfigMap(accountProxies, log);
+    }
+
+    private Map<String, Long> loadAccountIdMap(List<AccountCredential> accounts, Long platformId) {
+        List<String> usernames = accounts.stream()
+                .map(AccountCredential::userName)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.toList());
+        if (usernames.isEmpty()) {
+            return Map.of();
+        }
+        return accountsMapper.selectByNames(usernames, platformId).stream()
+                .collect(Collectors.toMap(Accounts::getUsername, Accounts::getId, (old, ignored) -> old));
+    }
+
+    private BigDecimal toDeductRate(Platform platform) {
+        BigDecimal rechargeAmount = platform.getRechargeAmount() == null ? BigDecimal.ZERO : platform.getRechargeAmount();
+        BigDecimal receivedAmount = platform.getReceivedAmount() == null ? BigDecimal.ZERO : platform.getReceivedAmount();
+        if (receivedAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ONE;
+        }
+        return rechargeAmount.divide(receivedAmount, 8, RoundingMode.HALF_UP);
     }
 
     private TaskContext prepareRequest(NewApiRequest request) {

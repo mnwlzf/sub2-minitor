@@ -116,6 +116,20 @@
                     <div class="account-item__time">测试时间 {{ formatDateTime(account.lastCollectTime) }}</div>
                     <div class="account-item__name">{{ account.username }}</div>
                     <div class="account-item__model">{{ account.testModel || '未设置测试模型' }}</div>
+                    <div class="account-item__groups">
+                      <el-tag
+                        v-for="group in account.keyGroups || []"
+                        :key="`${group.keyName || group.groupName}-${group.groupName}`"
+                        type="warning"
+                        effect="light"
+                        size="small"
+                      >
+                        {{ group.groupName || '未分组' }} / {{ formatRate(group.currentRate) }}
+                      </el-tag>
+                      <span v-if="!account.keyGroups || account.keyGroups.length === 0" class="account-item__group-empty">
+                        暂无密钥分组
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div class="account-item__stats">
@@ -408,6 +422,10 @@ function formatAmount(value?: number) {
 
 function formatPreciseAmount(value?: number, precision = 2) {
   return Number(value ?? 0).toFixed(precision)
+}
+
+function formatRate(value?: number) {
+  return Number(value ?? 0).toFixed(4)
 }
 
 function formatDateTime(value?: string) {
@@ -712,6 +730,18 @@ onMounted(reload)
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.account-item__groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.account-item__group-empty {
+  color: #94a3b8;
+  font-size: 12px;
 }
 
 .account-item__stats {

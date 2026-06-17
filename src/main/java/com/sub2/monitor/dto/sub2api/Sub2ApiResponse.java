@@ -2,6 +2,9 @@ package com.sub2.monitor.dto.sub2api;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 /**
  * sub2api 响应结果对象。
  *
@@ -14,4 +17,12 @@ public class Sub2ApiResponse {
      * 原始响应内容。
      */
     private String rawBody;
+
+    private List<ChannelResult> channelResults;
+
+    @Data
+    public static class ChannelResult {
+        private String groupName;
+        private BigDecimal ratio;
+    }
 }

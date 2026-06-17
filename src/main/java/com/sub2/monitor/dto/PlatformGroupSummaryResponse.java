@@ -26,5 +26,7 @@ public class PlatformGroupSummaryResponse {
         private BigDecimal currentRate;
         private BigDecimal actualRate;
         private OffsetDateTime collectTime;
+        private Boolean keyGroup;
+        private Long keyCount;
     }
 }

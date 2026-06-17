@@ -33,5 +33,20 @@ public class PlatformSummaryResponse {
         private BigDecimal actualConsume;
         private String testModel;
         private OffsetDateTime lastCollectTime;
+        private List<ApiKeyGroup> keyGroups;
+    }
+
+    @Data
+    public static class ApiKeyGroup {
+        private String keyName;
+        private String keyStatus;
+        private String groupName;
+        private BigDecimal currentRate;
+        private BigDecimal actualRate;
+        private BigDecimal todayActualCost;
+        private BigDecimal totalActualCost;
+        private BigDecimal usedAmount;
+        private BigDecimal remainAmount;
+        private OffsetDateTime collectTime;
     }
 }

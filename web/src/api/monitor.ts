@@ -22,6 +22,20 @@ export interface PlatformAccountSummary {
   actualConsume: number
   testModel?: string
   lastCollectTime?: string
+  keyGroups?: ApiKeyGroup[]
+}
+
+export interface ApiKeyGroup {
+  keyName?: string
+  keyStatus?: string
+  groupName?: string
+  currentRate?: number
+  actualRate?: number
+  todayActualCost?: number
+  totalActualCost?: number
+  usedAmount?: number
+  remainAmount?: number
+  collectTime?: string
 }
 
 export interface PlatformSummary {
@@ -124,6 +138,8 @@ export interface GroupRate {
   currentRate: number
   actualRate: number
   collectTime?: string
+  keyGroup?: boolean
+  keyCount?: number
 }
 
 export interface PlatformGroupSummary {
