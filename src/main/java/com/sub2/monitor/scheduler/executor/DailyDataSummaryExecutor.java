@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.sub2.monitor.dto.DailyAccountConsumeSummaryRow;
 import com.sub2.monitor.mapper.DailyAccountConsumeSummaryMapper;
 import com.sub2.monitor.service.MailService;
+import com.sub2.monitor.util.MailTemplateBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -102,12 +103,12 @@ public class DailyDataSummaryExecutor {
                         .thenComparing(DailyAccountConsumeSummaryRow::getUsername))
                 .collect(Collectors.groupingBy(DailyAccountConsumeSummaryRow::getPlatformName, java.util.LinkedHashMap::new, Collectors.toList()));
         StringBuilder builder = new StringBuilder();
-        builder.append("<h2>每日数据汇总</h2>");
-        builder.append("<p>汇总日期：").append(summaryDate).append("</p>");
-        builder.append("<p>账号数：").append(rows.size())
-                .append("，平台总消耗：").append(totalPlatformConsume)
-                .append("，实际总消耗：").append(totalActualConsume)
-                .append("</p>");
+        builder.append(MailTemplateBuilder.summaryGrid(
+                "汇总日期", summaryDate.toString(),
+                "账号数", String.valueOf(rows.size()),
+                "平台总消耗", totalPlatformConsume.toPlainString(),
+                "实际总消耗", totalActualConsume.toPlainString()
+        ));
         for (Map.Entry<String, List<DailyAccountConsumeSummaryRow>> entry : platformRows.entrySet()) {
             BigDecimal platformConsume = entry.getValue().stream()
                     .map(DailyAccountConsumeSummaryRow::getPlatformConsumeAmount)
@@ -117,32 +118,33 @@ public class DailyDataSummaryExecutor {
                     .map(DailyAccountConsumeSummaryRow::getActualConsumeAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add)
                     .setScale(2, RoundingMode.HALF_UP);
-            builder.append("<h3>").append(escapeHtml(entry.getKey()))
-                    .append(" / 平台消耗：").append(platformConsume)
-                    .append(" / 实际消耗：").append(actualConsume)
-                    .append("</h3>");
-            builder.append("<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\" style=\"border-collapse:collapse;\">");
-            builder.append("<thead><tr><th>账号</th><th>开始余额</th><th>结束余额</th><th>平台消耗</th><th>实际消耗</th><th>首条时间(北京时间)</th><th>末条时间(北京时间)</th></tr></thead><tbody>");
+            StringBuilder sectionBody = new StringBuilder();
             for (DailyAccountConsumeSummaryRow row : entry.getValue()) {
-                builder.append("<tr>")
-                        .append("<td>").append(escapeHtml(row.getUsername())).append("</td>")
-                        .append("<td>").append(row.getStartBalance()).append("</td>")
-                        .append("<td>").append(row.getEndBalance()).append("</td>")
-                        .append("<td>").append(row.getPlatformConsumeAmount()).append("</td>")
-                        .append("<td>").append(row.getActualConsumeAmount()).append("</td>")
-                        .append("<td>").append(formatBeijingTime(row.getFirstBalanceTime())).append("</td>")
-                        .append("<td>").append(formatBeijingTime(row.getLastBalanceTime())).append("</td>")
-                        .append("</tr>");
+                sectionBody.append(MailTemplateBuilder.accountRow(
+                        row.getUsername(),
+                        row.getStartBalance().toPlainString(),
+                        row.getEndBalance().toPlainString(),
+                        row.getPlatformConsumeAmount().toPlainString(),
+                        row.getActualConsumeAmount().toPlainString(),
+                        formatBeijingTime(row.getFirstBalanceTime()),
+                        formatBeijingTime(row.getLastBalanceTime())
+                ));
             }
-            builder.append("</tbody></table>");
+            builder.append(MailTemplateBuilder.section(
+                    entry.getKey(),
+                    "平台消耗：" + platformConsume.toPlainString() + " / 实际消耗：" + actualConsume.toPlainString(),
+                    sectionBody.toString()
+            ));
         }
-        return builder.toString();
+        return MailTemplateBuilder.page("每日数据汇总", "按平台和账号汇总前一日余额与消耗", builder.toString());
     }
 
     private String buildEmptyMailContent(LocalDate summaryDate) {
-        return "<h2>每日数据汇总</h2>"
-                + "<p>汇总日期：" + summaryDate + "</p>"
-                + "<p>该日期没有查询到账号余额历史记录，因此没有可汇总的消耗数据。</p>";
+        String body = MailTemplateBuilder.summaryGrid("汇总日期", summaryDate.toString())
+                + "<div style=\"padding:14px;border:1px solid #e5e7eb;border-radius:12px;background:#ffffff;color:#475569;font-size:14px;line-height:1.7;\">"
+                + "该日期没有查询到账号余额历史记录，因此没有可汇总的消耗数据。"
+                + "</div>";
+        return MailTemplateBuilder.page("每日数据汇总", "按平台和账号汇总前一日余额与消耗", body);
     }
 
     private String formatBeijingTime(OffsetDateTime value) {
@@ -150,17 +152,6 @@ public class DailyDataSummaryExecutor {
             return "-";
         }
         return value.atZoneSameInstant(BEIJING_ZONE).format(MAIL_TIME_FORMATTER);
-    }
-
-    private String escapeHtml(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;");
     }
 
     public record SummaryResult(LocalDate summaryDate,

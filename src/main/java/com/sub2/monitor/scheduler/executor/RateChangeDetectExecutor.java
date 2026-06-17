@@ -6,6 +6,7 @@ import com.sub2.monitor.entity.PlatformRateHistory;
 import com.sub2.monitor.mapper.PlatformRateHistoryMapper;
 import com.sub2.monitor.service.MailService;
 import com.sub2.monitor.service.PlatformService;
+import com.sub2.monitor.util.MailTemplateBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -150,36 +151,33 @@ public class RateChangeDetectExecutor {
 
     private String buildMailContent(List<PlatformChange> changedPlatforms, int changeCount) {
         StringBuilder builder = new StringBuilder();
-        builder.append("<h2>分组及倍率变化提醒</h2>");
-        builder.append("<p>变化平台数：").append(changedPlatforms.size())
-                .append("，变化项：").append(changeCount)
-                .append("，检测时间：").append(OffsetDateTime.now(BEIJING_ZONE).format(MAIL_TIME_FORMATTER))
-                .append("</p>");
+        String detectTime = OffsetDateTime.now(BEIJING_ZONE).format(MAIL_TIME_FORMATTER);
+        builder.append(MailTemplateBuilder.summaryGrid(
+                "变化平台数", String.valueOf(changedPlatforms.size()),
+                "变化项", String.valueOf(changeCount),
+                "检测时间", detectTime
+        ));
 
         for (PlatformChange change : changedPlatforms) {
-            builder.append("<h3>").append(escapeHtml(change.platform().getName()))
-                    .append("（").append(escapeHtml(change.platform().getBaseUrl())).append("）</h3>");
-            builder.append("<p>上一批次：").append(formatBeijingTime(change.previousTime()))
-                    .append("，最新批次：").append(formatBeijingTime(change.latestTime()))
-                    .append("</p>");
-            builder.append("<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\" style=\"border-collapse:collapse;\">");
-            builder.append("<thead><tr><th>变化类型</th><th>渠道名称</th><th>原倍率</th><th>新倍率</th></tr></thead><tbody>");
+            StringBuilder sectionBody = new StringBuilder();
             for (ChannelAdded item : change.added()) {
-                builder.append("<tr><td>新增</td><td>").append(escapeHtml(item.channelName()))
-                        .append("</td><td>-</td><td>").append(formatRate(item.currentRate())).append("</td></tr>");
+                sectionBody.append(MailTemplateBuilder.changeRow("新增", item.channelName(), "-", formatRate(item.currentRate()), "#16a34a"));
             }
             for (ChannelRemoved item : change.removed()) {
-                builder.append("<tr><td>减少</td><td>").append(escapeHtml(item.channelName()))
-                        .append("</td><td>").append(formatRate(item.previousRate())).append("</td><td>-</td></tr>");
+                sectionBody.append(MailTemplateBuilder.changeRow("减少", item.channelName(), formatRate(item.previousRate()), "-", "#dc2626"));
             }
             for (RateChanged item : change.rateChanged()) {
-                builder.append("<tr><td>倍率变化</td><td>").append(escapeHtml(item.channelName()))
-                        .append("</td><td>").append(formatRate(item.previousRate()))
-                        .append("</td><td>").append(formatRate(item.currentRate())).append("</td></tr>");
+                sectionBody.append(MailTemplateBuilder.changeRow("倍率变化", item.channelName(), formatRate(item.previousRate()), formatRate(item.currentRate()), "#d97706"));
             }
-            builder.append("</tbody></table>");
+            builder.append(MailTemplateBuilder.section(
+                    change.platform().getName(),
+                    change.platform().getBaseUrl()
+                            + " / 上一批次：" + formatBeijingTime(change.previousTime())
+                            + " / 最新批次：" + formatBeijingTime(change.latestTime()),
+                    sectionBody.toString()
+            ));
         }
-        return builder.toString();
+        return MailTemplateBuilder.page("分组及倍率变化提醒", "检测到平台分组或倍率发生变化", builder.toString());
     }
 
     private String formatBeijingTime(OffsetDateTime value) {
@@ -191,17 +189,6 @@ public class RateChangeDetectExecutor {
 
     private String formatRate(BigDecimal value) {
         return value == null ? "-" : value.stripTrailingZeros().toPlainString();
-    }
-
-    private String escapeHtml(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;");
     }
 
     public record DetectResult(int platformCount,
