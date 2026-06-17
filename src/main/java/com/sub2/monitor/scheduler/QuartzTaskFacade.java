@@ -20,12 +20,20 @@ public class QuartzTaskFacade {
         quartzJobService.scheduleDailyDataSummary(cronExpression);
     }
 
+    public void startRateChangeDetect(String cronExpression) {
+        quartzJobService.scheduleRateChangeDetect(cronExpression);
+    }
+
     public void scheduleTask(TaskDefinition taskDefinition) {
         quartzJobService.schedule(taskDefinition);
     }
 
     public void runBalanceCollectionNow() {
         quartzJobService.triggerNow(QuartzJobNames.BALANCE_CHANNEL_COLLECT_TASK_KEY, QuartzJobNames.BALANCE_CHANNEL_COLLECT_TASK_GROUP);
+    }
+
+    public void runRateChangeDetectNow() {
+        quartzJobService.triggerNow(QuartzJobNames.RATE_CHANGE_DETECT_TASK_KEY, QuartzJobNames.RATE_CHANGE_DETECT_TASK_GROUP);
     }
 
     public void runTaskNow(String taskKey, String taskGroup) {

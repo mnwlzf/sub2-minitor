@@ -5,12 +5,14 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.sub2.monitor.common.api.ApiResponse;
 import com.sub2.monitor.common.api.PageResponse;
 import com.sub2.monitor.dto.TaskScheduleRequest;
+import com.sub2.monitor.dto.TaskScheduleResponse;
 import com.sub2.monitor.entity.TaskExecutionLog;
 import com.sub2.monitor.entity.TaskSchedule;
 import com.sub2.monitor.scheduler.QuartzJobNames;
 import com.sub2.monitor.scheduler.QuartzTaskFacade;
 import com.sub2.monitor.scheduler.TaskDefinition;
 import com.sub2.monitor.service.TaskExecutionLogService;
+import com.sub2.monitor.service.TaskNotificationSceneService;
 import com.sub2.monitor.service.TaskScheduleService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,21 +31,24 @@ public class TaskScheduleController {
 
     private final TaskScheduleService taskScheduleService;
     private final TaskExecutionLogService taskExecutionLogService;
+    private final TaskNotificationSceneService taskNotificationSceneService;
     private final QuartzTaskFacade quartzTaskFacade;
 
     public TaskScheduleController(TaskScheduleService taskScheduleService,
                                   TaskExecutionLogService taskExecutionLogService,
+                                  TaskNotificationSceneService taskNotificationSceneService,
                                   QuartzTaskFacade quartzTaskFacade) {
         this.taskScheduleService = taskScheduleService;
         this.taskExecutionLogService = taskExecutionLogService;
+        this.taskNotificationSceneService = taskNotificationSceneService;
         this.quartzTaskFacade = quartzTaskFacade;
     }
 
     @GetMapping
-    public ApiResponse<PageResponse<TaskSchedule>> list(@RequestParam(defaultValue = "1") long pageNo,
-                                                        @RequestParam(defaultValue = "20") long pageSize,
-                                                        @RequestParam(required = false) String keyword,
-                                                        @RequestParam(required = false) String taskGroup) {
+    public ApiResponse<PageResponse<TaskScheduleResponse>> list(@RequestParam(defaultValue = "1") long pageNo,
+                                                                @RequestParam(defaultValue = "20") long pageSize,
+                                                                @RequestParam(required = false) String keyword,
+                                                                @RequestParam(required = false) String taskGroup) {
         LambdaQueryWrapper<TaskSchedule> wrapper = new LambdaQueryWrapper<TaskSchedule>()
                 .orderByDesc(TaskSchedule::getCreateTime);
         if (keyword != null && !keyword.isBlank()) {
@@ -55,11 +60,11 @@ public class TaskScheduleController {
             wrapper.eq(TaskSchedule::getTaskGroup, taskGroup);
         }
         Page<TaskSchedule> page = taskScheduleService.page(new Page<>(pageNo, pageSize), wrapper);
-        PageResponse<TaskSchedule> response = new PageResponse<>();
+        PageResponse<TaskScheduleResponse> response = new PageResponse<>();
         response.setTotal(page.getTotal());
         response.setPageNo(pageNo);
         response.setPageSize(pageSize);
-        response.setRecords(page.getRecords());
+        response.setRecords(page.getRecords().stream().map(this::toTaskResponse).toList());
         return ApiResponse.success(response);
     }
 
@@ -89,6 +94,7 @@ public class TaskScheduleController {
             schedule.setUpdateTime(OffsetDateTime.now());
             taskScheduleService.updateById(schedule);
         }
+        taskNotificationSceneService.saveBinding(schedule.getTaskKey(), request.getNotificationSceneKey());
 
         if (Boolean.TRUE.equals(schedule.getIsEnabled())) {
             quartzTaskFacade.scheduleTask(TaskDefinition.builder()
@@ -138,6 +144,7 @@ public class TaskScheduleController {
             schedule.setUpdateTime(OffsetDateTime.now());
             taskScheduleService.updateById(schedule);
         }
+        taskNotificationSceneService.saveBinding(schedule.getTaskKey(), request.getNotificationSceneKey());
 
         quartzTaskFacade.startBalanceCollection(taskDefinition.getCronExpression());
         return ApiResponse.success(null);
@@ -178,6 +185,7 @@ public class TaskScheduleController {
             schedule.setUpdateTime(OffsetDateTime.now());
             taskScheduleService.updateById(schedule);
         }
+        taskNotificationSceneService.saveBinding(schedule.getTaskKey(), request.getNotificationSceneKey());
 
         quartzTaskFacade.startDailyDataSummary(taskDefinition.getCronExpression());
         return ApiResponse.success(null);
@@ -198,6 +206,7 @@ public class TaskScheduleController {
         schedule.setIsEnabled(Optional.ofNullable(request.getIsEnabled()).orElse(schedule.getIsEnabled()));
         schedule.setUpdateTime(OffsetDateTime.now());
         taskScheduleService.updateById(schedule);
+        taskNotificationSceneService.saveBinding(schedule.getTaskKey(), request.getNotificationSceneKey());
         quartzTaskFacade.scheduleTask(TaskDefinition.builder()
                 .taskKey(schedule.getTaskKey())
                 .taskName(schedule.getTaskName())
@@ -303,5 +312,21 @@ public class TaskScheduleController {
         response.setPageSize(pageSize);
         response.setRecords(page.getRecords());
         return ApiResponse.success(response);
+    }
+
+    private TaskScheduleResponse toTaskResponse(TaskSchedule schedule) {
+        TaskScheduleResponse response = new TaskScheduleResponse();
+        response.setId(schedule.getId());
+        response.setTaskKey(schedule.getTaskKey());
+        response.setTaskName(schedule.getTaskName());
+        response.setTaskGroup(schedule.getTaskGroup());
+        response.setCronExpression(schedule.getCronExpression());
+        response.setJobClass(schedule.getJobClass());
+        response.setDescription(schedule.getDescription());
+        response.setIsEnabled(schedule.getIsEnabled());
+        response.setCreateTime(schedule.getCreateTime());
+        response.setUpdateTime(schedule.getUpdateTime());
+        response.setNotificationSceneKey(taskNotificationSceneService.getEnabledSceneKey(schedule.getTaskKey()));
+        return response;
     }
 }

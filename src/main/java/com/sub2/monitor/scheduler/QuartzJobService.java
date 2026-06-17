@@ -9,6 +9,8 @@ public interface QuartzJobService {
 
     void scheduleDailyDataSummary(String cronExpression);
 
+    void scheduleRateChangeDetect(String cronExpression);
+
     void triggerNow(String taskKey, String taskGroup);
 
     void pause(String taskKey, String taskGroup);

@@ -28,6 +28,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="cronExpression" label="Cron" min-width="200" />
+        <el-table-column label="通知场景" width="150">
+          <template #default="{ row }">
+            {{ sceneName(row.notificationSceneKey) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="jobClass" label="执行类" min-width="280" show-overflow-tooltip />
         <el-table-column prop="isEnabled" label="状态" width="100">
           <template #default="{ row }">
@@ -85,6 +90,16 @@
           <el-form-item label="启用">
             <el-switch v-model="form.isEnabled" />
           </el-form-item>
+          <el-form-item label="通知场景">
+            <el-select v-model="form.notificationSceneKey" clearable filterable placeholder="不发送通知">
+              <el-option
+                v-for="scene in scenes"
+                :key="scene.sceneKey"
+                :label="scene.sceneName"
+                :value="scene.sceneKey"
+              />
+            </el-select>
+          </el-form-item>
           <el-form-item label="执行类" prop="jobClass" class="form-item--full">
             <el-input v-model="form.jobClass" />
           </el-form-item>
@@ -136,6 +151,7 @@ import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import {
+  listMailScenes,
   listTasks,
   saveTask,
   updateTask,
@@ -143,12 +159,14 @@ import {
   pauseTask,
   resumeTask,
   previewCron,
+  type MailScene,
   type TaskSchedule
 } from '@/api/monitor'
 
 const loading = ref(false)
 const saving = ref(false)
 const tasks = ref<TaskSchedule[]>([])
+const scenes = ref<MailScene[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
@@ -171,7 +189,8 @@ const form = reactive({
   cronExpression: '0 */5 * * * ?',
   jobClass: 'com.sub2.monitor.scheduler.job.BalanceChannelCollectJob',
   description: '',
-  isEnabled: true
+  isEnabled: true,
+  notificationSceneKey: ''
 })
 
 const rules: FormRules = {
@@ -193,6 +212,7 @@ function resetForm() {
   form.jobClass = 'com.sub2.monitor.scheduler.job.BalanceChannelCollectJob'
   form.description = ''
   form.isEnabled = true
+  form.notificationSceneKey = ''
   previewTimes.value = []
   cronPreviewError.value = ''
 }
@@ -205,6 +225,7 @@ function bindRow(row: TaskSchedule) {
   form.jobClass = row.jobClass
   form.description = row.description ?? ''
   form.isEnabled = row.isEnabled
+  form.notificationSceneKey = row.notificationSceneKey ?? ''
   void loadPreview(row.cronExpression)
 }
 
@@ -290,7 +311,8 @@ async function saveForm() {
       cronExpression: form.cronExpression,
       jobClass: form.jobClass,
       description: form.description,
-      isEnabled: form.isEnabled
+      isEnabled: form.isEnabled,
+      notificationSceneKey: form.notificationSceneKey || undefined
     }
     if (dialogMode.value === 'create') {
       await saveTask(payload)
@@ -338,6 +360,19 @@ function taskGroupLabel(value?: string) {
   return value ?? '-'
 }
 
+function sceneName(sceneKey?: string) {
+  if (!sceneKey) {
+    return '-'
+  }
+  const scene = scenes.value.find(item => item.sceneKey === sceneKey)
+  return scene?.sceneName ?? sceneKey
+}
+
+async function loadScenes() {
+  const response = await listMailScenes()
+  scenes.value = response.data
+}
+
 let cronPreviewTimer: number | undefined
 watch(
   () => form.cronExpression,
@@ -357,7 +392,9 @@ onBeforeUnmount(() => {
   }
 })
 
-onMounted(reload)
+onMounted(async () => {
+  await Promise.all([reload(), loadScenes()])
+})
 </script>
 
 <style scoped>

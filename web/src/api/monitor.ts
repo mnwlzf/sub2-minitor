@@ -153,6 +153,7 @@ export interface TaskSchedule {
   jobClass: string
   description?: string
   isEnabled: boolean
+  notificationSceneKey?: string
   createTime?: string
   updateTime?: string
 }
@@ -182,6 +183,7 @@ export function saveTask(data: {
   jobClass: string
   description?: string
   isEnabled?: boolean
+  notificationSceneKey?: string
 }) {
   return http.post('/tasks', data)
 }
@@ -194,6 +196,7 @@ export function updateTask(data: {
   jobClass: string
   description?: string
   isEnabled?: boolean
+  notificationSceneKey?: string
 }) {
   return http.put('/tasks', data)
 }

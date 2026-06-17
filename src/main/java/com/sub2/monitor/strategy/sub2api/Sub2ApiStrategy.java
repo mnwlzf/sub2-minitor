@@ -185,6 +185,7 @@ public class Sub2ApiStrategy extends AbstractApiStrategy<Sub2ApiRequest, Sub2Api
         String url = buildUrl(request.getBaseUrl(), "/api/v1/groups/available?timezone=Asia%2FShanghai");
         Map<String, PlatformRateHistory> historyMap = new LinkedHashMap<>();
         List<Sub2ApiResponse> responses = new ArrayList<>();
+        OffsetDateTime batchTime = OffsetDateTime.now();
 
         // 【2】按账号请求渠道，使用 mergeHeaders 合并登录阶段保存的 Authorization / Cookie。
         for (AccountCredential account : context.accounts()) {
@@ -208,7 +209,7 @@ public class Sub2ApiStrategy extends AbstractApiStrategy<Sub2ApiRequest, Sub2Api
                     history.setPlatformId(context.platform().getId());
                     history.setChannelName(channelData.getName());
                     history.setCurrentRate(channelData.getRateMultiplier() == null ? BigDecimal.ONE : channelData.getRateMultiplier());
-                    history.setCreateTime(OffsetDateTime.now());
+                    history.setCreateTime(batchTime);
                     historyMap.putIfAbsent(channelData.getName(), history);
                 }
 

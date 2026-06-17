@@ -103,6 +103,19 @@ public class QuartzJobServiceImpl implements QuartzJobService {
     }
 
     @Override
+    public void scheduleRateChangeDetect(String cronExpression) {
+        TaskDefinition taskDefinition = TaskDefinition.builder()
+                .taskKey(QuartzJobNames.RATE_CHANGE_DETECT_TASK_KEY)
+                .taskName(QuartzJobNames.RATE_CHANGE_DETECT_TASK_NAME)
+                .taskGroup(QuartzJobNames.RATE_CHANGE_DETECT_TASK_GROUP)
+                .jobClassName(QuartzJobNames.RATE_CHANGE_DETECT_JOB_CLASS)
+                .cronExpression(cronExpression)
+                .description("每 10 分钟对比平台最新两批分组及倍率变化，与采集任务错开 5 分钟")
+                .build();
+        schedule(taskDefinition);
+    }
+
+    @Override
     public void triggerNow(String taskKey, String taskGroup) {
         try {
             ensureJobExists(taskKey, taskGroup);

@@ -9,4 +9,19 @@
             (#{history.platformId}, #{history.channelName}, #{history.currentRate}, #{history.createTime})
         </foreach>
     </insert>
+
+    <select id="selectLatestTwoBatchesByPlatformId" resultType="com.sub2.monitor.entity.PlatformRateHistory">
+        select id, platform_id, channel_name, current_rate, create_time
+        from platform_rate_history
+        where platform_id = #{platformId}
+          and create_time in (
+              select create_time
+              from platform_rate_history
+              where platform_id = #{platformId}
+              group by create_time
+              order by create_time desc
+              limit 2
+          )
+        order by create_time desc, channel_name asc
+    </select>
 </mapper>
