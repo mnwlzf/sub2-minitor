@@ -2,6 +2,7 @@ package com.sub2.monitor.collect.sub2api.service.impl;
 
 import com.sub2.monitor.collect.common.dto.LoginResponse;
 import com.sub2.monitor.collect.sub2api.dto.Sub2AvailableGroupsResponse;
+import com.sub2.monitor.collect.sub2api.dto.Sub2KeysResponse;
 import com.sub2.monitor.collect.sub2api.dto.Sub2LoginRequest;
 import com.sub2.monitor.collect.sub2api.dto.Sub2LoginRes;
 import com.sub2.monitor.collect.sub2api.service.Sub2CollectService;
@@ -35,6 +36,7 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
 
     private static final String LOGIN_PATH = "/api/v1/auth/login";
     private static final String AVAILABLE_GROUPS_PATH = "/api/v1/groups/available?timezone=Asia%2FShanghai";
+    private static final String KEYS_PATH = "/api/v1/keys?page=1&page_size=100&sort_by=created_at&sort_order=desc&timezone=Asia%2FShanghai";
     private static final String AUTHORIZATION_CACHE_PREFIX = "authorization:";
     private static final int CONNECT_TIMEOUT_MILLIS = 5000;
     private static final int RESPONSE_TIMEOUT_SECONDS = 10;
@@ -141,7 +143,7 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
                 }
 
                 // 仅缓存 token，不打印 token 明文，避免日志泄露认证凭据。
-                redisTemplate.opsForValue().set(AUTHORIZATION_CACHE_PREFIX + email, accessToken);
+                redisTemplate.opsForValue().set(AUTHORIZATION_CACHE_PREFIX + email, accessToken,TimeUnit.SECONDS.toMinutes(120));
                 log.info("Sub2 账号登录成功并已缓存 token，账号={}，token长度={}", email, accessToken.length());
                 return response;
             } catch (WebClientResponseException e) {
@@ -241,6 +243,92 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
 
         // 当前接口返回单个响应对象，先沿用原有行为：多个账号成功时返回第一个成功结果。
         log.info("Sub2 可用分组采集任务结束，baseUrl={}，成功数量={}", baseUrl, responses.size());
+        return responses.isEmpty() ? null : responses.get(0);
+    }
+
+    @Override
+    public Sub2KeysResponse collectSub2Keys(String baseUrl) {
+        List<Account> accounts = accountMapper.selectSub2apiAccounts(baseUrl);
+        if (accounts.isEmpty()) {
+            log.info("没有需要采集密钥的账号 (baseUrl={})", baseUrl);
+            return null;
+        }
+
+        List<Sub2KeysResponse> responses = new ArrayList<>();
+        log.info("开始采集 Sub2 密钥列表，baseUrl={}，账号数量={}", baseUrl, accounts.size());
+
+        // 密钥列表接口与分组接口一致，都依赖登录后缓存的 Bearer token。
+        WebClient client = buildWebClient(baseUrl);
+
+        for (Account account : accounts) {
+            String email = account.getEmail();
+
+            String token = redisTemplate.opsForValue().get(AUTHORIZATION_CACHE_PREFIX + email);
+            if (token == null || token.isBlank()) {
+                log.warn("Sub2 密钥采集跳过账号，Redis 中未找到 token，账号={}，baseUrl={}", email, baseUrl);
+                continue;
+            }
+
+            WebClient requestClient = client.mutate()
+                    .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .build();
+
+            log.info("开始请求 Sub2 密钥列表，账号={}，url={}{}", email, baseUrl, KEYS_PATH);
+
+            try {
+                Sub2KeysResponse response = requestClient.get()
+                        .uri(KEYS_PATH)
+                        .exchangeToMono(clientResponse -> {
+                            HttpStatusCode status = clientResponse.statusCode();
+                            log.info("Sub2 密钥列表接口响应，账号={}，状态码={}", email, status);
+
+                            if (status.is2xxSuccessful()) {
+                                return clientResponse.bodyToMono(Sub2KeysResponse.class)
+                                        .doOnSuccess(body -> {
+                                            int keyCount = body == null || body.getData() == null || body.getData().getItems() == null
+                                                    ? 0
+                                                    : body.getData().getItems().size();
+                                            int total = body == null || body.getData() == null ? 0 : body.getData().getTotal();
+                                            log.info("Sub2 密钥列表解析完成，账号={}，当前页数量={}，总数量={}", email, keyCount, total);
+                                            log.debug("Sub2 密钥列表响应体，账号={}，响应={}", email, body);
+                                        });
+                            } else {
+                                // 记录错误体，便于区分 token 过期、权限不足、参数异常等平台返回。
+                                return clientResponse.bodyToMono(String.class)
+                                        .flatMap(errorBody -> {
+                                            log.error("Sub2 密钥列表请求失败，账号={}，状态码={}，响应体={}",
+                                                    email, status, errorBody);
+                                            return Mono.error(new RuntimeException(
+                                                    "Request failed with status: " + status + ", body: " + errorBody));
+                                        });
+                            }
+                        })
+                        .retryWhen(Retry.fixedDelay(RETRY_TIMES, Duration.ofSeconds(RETRY_DELAY_SECONDS))
+                                .doBeforeRetry(retrySignal ->
+                                        log.warn("Sub2 密钥列表采集重试，账号={}，第{}次，原因={}",
+                                                email,
+                                                retrySignal.totalRetries() + 1,
+                                                retrySignal.failure().getMessage())
+                                )
+                        )
+                        .block();
+
+                if (response != null) {
+                    responses.add(response);
+                    log.info("Sub2 密钥列表采集成功，账号={}，当前成功数量={}", email, responses.size());
+                } else {
+                    log.warn("Sub2 密钥列表采集返回空响应，账号={}", email);
+                }
+            } catch (Exception e) {
+                // 与分组采集保持一致，单账号失败后继续处理其他账号。
+                Throwable rootCause = Exceptions.unwrap(e);
+                log.error("Sub2 密钥列表采集最终失败，账号={}，异常类型={}，原因={}",
+                        email, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
+            }
+        }
+
+        // 当前 service 方法返回单个响应，多个账号成功时沿用分组接口行为返回第一个成功结果。
+        log.info("Sub2 密钥列表采集任务结束，baseUrl={}，成功数量={}", baseUrl, responses.size());
         return responses.isEmpty() ? null : responses.get(0);
     }
 

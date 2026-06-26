@@ -15,6 +15,7 @@ class Sub2MonitorApplicationTests {
     void contextLoads() {
         service.login("https://codex.trovebox.online");
         service.collectSub2AvailableGroups("https://codex.trovebox.online");
+        service.collectSub2Keys("https://codex.trovebox.online");
     }
 
 }
