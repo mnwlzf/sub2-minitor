@@ -1,8 +1,11 @@
 package com.sub2.monitor.collect.newApi.service.impl;
 
 import com.sub2.monitor.collect.common.dto.LoginResponse;
+import com.sub2.monitor.collect.newApi.dto.NewApiGroupsResponse;
 import com.sub2.monitor.collect.newApi.dto.NewApiLoginReq;
 import com.sub2.monitor.collect.newApi.dto.NewApiLoginRes;
+import com.sub2.monitor.collect.newApi.dto.NewApiRawGroupsResponse;
+import com.sub2.monitor.collect.newApi.dto.NewApiTokensResponse;
 import com.sub2.monitor.collect.newApi.service.NewApiCollectService;
 import com.sub2.monitor.monitor.entity.Account;
 import com.sub2.monitor.monitor.mapper.AccountMapper;
@@ -24,7 +27,9 @@ import reactor.util.retry.Retry;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -32,6 +37,8 @@ import java.util.concurrent.TimeUnit;
 public class NewApiCollectServiceImpl implements NewApiCollectService {
 
     private static final String LOGIN_PATH = "/api/user/login";
+    private static final String GROUPS_PATH = "/api/user/self/groups";
+    private static final String TOKENS_PATH = "/api/token/?p=1&size=20";
     private static final String AUTHORIZATION_CACHE_PREFIX = "newapi:authorization:";
     private static final String COOKIE_CACHE_NAME = "cookie";
     private static final String NEW_API_USER_CACHE_NAME = "new-api-user";
@@ -175,6 +182,166 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
         return null;
     }
 
+    @Override
+    public NewApiGroupsResponse collectGroups(String baseUrl) {
+        List<Account> accounts = accountMapper.selectNewApiAccounts(baseUrl);
+        if (accounts.isEmpty()) {
+            log.info("没有需要采集分组的 NewApi 账号 (baseUrl={})", baseUrl);
+            return null;
+        }
+        log.info("开始采集 NewApi 分组，baseUrl={}，账号数量={}", baseUrl, accounts.size());
+
+        WebClient client = buildWebClient(baseUrl);
+        List<NewApiGroupsResponse> responses = new ArrayList<>();
+
+        for (Account account : accounts) {
+            String username = account.getUsername();
+            String cookie = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, COOKIE_CACHE_NAME));
+            String newApiUser = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, NEW_API_USER_CACHE_NAME));
+            if (cookie == null || cookie.isBlank() || newApiUser == null || newApiUser.isBlank()) {
+                log.warn("NewApi 分组采集跳过账号，Redis 中缺少 Cookie 或 {}，账号={}，baseUrl={}", NEW_API_USER_HEADER, username, baseUrl);
+                continue;
+            }
+
+            WebClient requestClient = client.mutate()
+                    .defaultHeader(HttpHeaders.COOKIE, cookie)
+                    .defaultHeader(NEW_API_USER_HEADER, newApiUser)
+                    .build();
+
+            log.info("开始请求 NewApi 分组，账号={}，url={}{}", username, baseUrl, GROUPS_PATH);
+            try {
+                NewApiGroupsResponse response = requestClient.get()
+                        .uri(GROUPS_PATH)
+                        .exchangeToMono(clientResponse -> {
+                            HttpStatusCode status = clientResponse.statusCode();
+                            log.info("NewApi 分组接口响应，账号={}，状态码={}", username, status);
+
+                            if (status.is2xxSuccessful()) {
+                                return clientResponse.bodyToMono(NewApiRawGroupsResponse.class)
+                                        .map(this::convertGroupsResponse)
+                                        .doOnSuccess(body -> {
+                                            int groupCount = body == null || body.getData() == null ? 0 : body.getData().size();
+                                            log.info("NewApi 分组解析完成，账号={}，分组数量={}", username, groupCount);
+                                            log.debug("NewApi 分组响应体，账号={}，响应={}", username, body);
+                                        });
+                            }
+
+                            return clientResponse.bodyToMono(String.class)
+                                    .flatMap(errorBody -> {
+                                        log.error("NewApi 分组请求失败，账号={}，状态码={}，响应体={}",
+                                                username, status, errorBody);
+                                        return Mono.error(new RuntimeException(
+                                                "Request failed with status: " + status + ", body: " + errorBody));
+                                    });
+                        })
+                        .retryWhen(Retry.fixedDelay(RETRY_TIMES, Duration.ofSeconds(RETRY_DELAY_SECONDS))
+                                .doBeforeRetry(retrySignal ->
+                                        log.warn("NewApi 分组采集重试，账号={}，第{}次，原因={}",
+                                                username,
+                                                retrySignal.totalRetries() + 1,
+                                                retrySignal.failure().getMessage())
+                                )
+                        )
+                        .block();
+
+                if (response != null) {
+                    responses.add(response);
+                    log.info("NewApi 分组采集成功，账号={}，当前成功数量={}", username, responses.size());
+                } else {
+                    log.warn("NewApi 分组采集返回空响应，账号={}", username);
+                }
+            } catch (Exception e) {
+                Throwable rootCause = Exceptions.unwrap(e);
+                log.error("NewApi 分组采集最终失败，账号={}，异常类型={}，原因={}",
+                        username, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
+            }
+        }
+
+        log.info("NewApi 分组采集任务结束，baseUrl={}，成功数量={}", baseUrl, responses.size());
+        return responses.isEmpty() ? null : responses.get(0);
+    }
+
+    @Override
+    public NewApiTokensResponse collectTokens(String baseUrl) {
+        List<Account> accounts = accountMapper.selectNewApiAccounts(baseUrl);
+        if (accounts.isEmpty()) {
+            log.info("没有需要采集令牌的 NewApi 账号 (baseUrl={})", baseUrl);
+            return null;
+        }
+        log.info("开始采集 NewApi 令牌列表，baseUrl={}，账号数量={}", baseUrl, accounts.size());
+
+        WebClient client = buildWebClient(baseUrl);
+        List<NewApiTokensResponse> responses = new ArrayList<>();
+
+        for (Account account : accounts) {
+            String username = account.getUsername();
+            String cookie = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, COOKIE_CACHE_NAME));
+            String newApiUser = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, NEW_API_USER_CACHE_NAME));
+            if (cookie == null || cookie.isBlank() || newApiUser == null || newApiUser.isBlank()) {
+                log.warn("NewApi 令牌采集跳过账号，Redis 中缺少 Cookie 或 {}，账号={}，baseUrl={}", NEW_API_USER_HEADER, username, baseUrl);
+                continue;
+            }
+
+            WebClient requestClient = client.mutate()
+                    .defaultHeader(HttpHeaders.COOKIE, cookie)
+                    .defaultHeader(NEW_API_USER_HEADER, newApiUser)
+                    .build();
+
+            log.info("开始请求 NewApi 令牌列表，账号={}，url={}{}", username, baseUrl, TOKENS_PATH);
+            try {
+                NewApiTokensResponse response = requestClient.get()
+                        .uri(TOKENS_PATH)
+                        .exchangeToMono(clientResponse -> {
+                            HttpStatusCode status = clientResponse.statusCode();
+                            log.info("NewApi 令牌列表接口响应，账号={}，状态码={}", username, status);
+
+                            if (status.is2xxSuccessful()) {
+                                return clientResponse.bodyToMono(NewApiTokensResponse.class)
+                                        .doOnSuccess(body -> {
+                                            int tokenCount = body == null || body.getData() == null || body.getData().getItems() == null
+                                                    ? 0
+                                                    : body.getData().getItems().size();
+                                            int total = body == null || body.getData() == null ? 0 : body.getData().getTotal();
+                                            log.info("NewApi 令牌列表解析完成，账号={}，当前页数量={}，总数量={}", username, tokenCount, total);
+                                            log.debug("NewApi 令牌列表响应体，账号={}，响应={}", username, body);
+                                        });
+                            }
+
+                            return clientResponse.bodyToMono(String.class)
+                                    .flatMap(errorBody -> {
+                                        log.error("NewApi 令牌列表请求失败，账号={}，状态码={}，响应体={}",
+                                                username, status, errorBody);
+                                        return Mono.error(new RuntimeException(
+                                                "Request failed with status: " + status + ", body: " + errorBody));
+                                    });
+                        })
+                        .retryWhen(Retry.fixedDelay(RETRY_TIMES, Duration.ofSeconds(RETRY_DELAY_SECONDS))
+                                .doBeforeRetry(retrySignal ->
+                                        log.warn("NewApi 令牌列表采集重试，账号={}，第{}次，原因={}",
+                                                username,
+                                                retrySignal.totalRetries() + 1,
+                                                retrySignal.failure().getMessage())
+                                )
+                        )
+                        .block();
+
+                if (response != null) {
+                    responses.add(response);
+                    log.info("NewApi 令牌列表采集成功，账号={}，当前成功数量={}", username, responses.size());
+                } else {
+                    log.warn("NewApi 令牌列表采集返回空响应，账号={}", username);
+                }
+            } catch (Exception e) {
+                Throwable rootCause = Exceptions.unwrap(e);
+                log.error("NewApi 令牌列表采集最终失败，账号={}，异常类型={}，原因={}",
+                        username, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
+            }
+        }
+
+        log.info("NewApi 令牌列表采集任务结束，baseUrl={}，成功数量={}", baseUrl, responses.size());
+        return responses.isEmpty() ? null : responses.get(0);
+    }
+
     /**
      * 构建 NewApi 专用客户端，统一设置基础请求头和超时，避免各接口配置不一致。
      */
@@ -190,6 +357,33 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
                                 .responseTimeout(Duration.ofSeconds(RESPONSE_TIMEOUT_SECONDS))
                 ))
                 .build();
+    }
+
+    /**
+     * NewApi 分组接口返回 Map，key 是分组名；这里转换成列表，便于后续统一处理 name/desc/ratio。
+     */
+    private NewApiGroupsResponse convertGroupsResponse(NewApiRawGroupsResponse rawResponse) {
+        NewApiGroupsResponse response = new NewApiGroupsResponse();
+        if (rawResponse == null) {
+            return response;
+        }
+
+        response.setSuccess(rawResponse.getSuccess());
+        response.setMessage(rawResponse.getMessage());
+        List<NewApiGroupsResponse.GroupItem> groups = new ArrayList<>();
+        if (rawResponse.getData() != null) {
+            for (Map.Entry<String, NewApiRawGroupsResponse.GroupValue> entry : rawResponse.getData().entrySet()) {
+                NewApiGroupsResponse.GroupItem group = new NewApiGroupsResponse.GroupItem();
+                group.setName(entry.getKey());
+                if (entry.getValue() != null) {
+                    group.setDesc(entry.getValue().getDesc());
+                    group.setRatio(entry.getValue().getRatio());
+                }
+                groups.add(group);
+            }
+        }
+        response.setData(groups);
+        return response;
     }
 
     /**
