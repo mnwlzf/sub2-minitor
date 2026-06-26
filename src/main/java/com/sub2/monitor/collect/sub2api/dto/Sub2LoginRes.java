@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @Data
-public class Sub2ApiLoginRes  {
+public class Sub2LoginRes {
 
     private Integer code;
 
