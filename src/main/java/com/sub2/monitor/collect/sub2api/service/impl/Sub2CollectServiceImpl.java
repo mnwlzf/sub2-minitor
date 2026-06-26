@@ -37,7 +37,7 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
     private static final String LOGIN_PATH = "/api/v1/auth/login";
     private static final String AVAILABLE_GROUPS_PATH = "/api/v1/groups/available?timezone=Asia%2FShanghai";
     private static final String KEYS_PATH = "/api/v1/keys?page=1&page_size=100&sort_by=created_at&sort_order=desc&timezone=Asia%2FShanghai";
-    private static final String AUTHORIZATION_CACHE_PREFIX = "authorization:";
+    private static final String AUTHORIZATION_CACHE_PREFIX = "sub2api:authorization:";
     private static final int CONNECT_TIMEOUT_MILLIS = 5000;
     private static final int RESPONSE_TIMEOUT_SECONDS = 10;
     private static final int RETRY_TIMES = 3;
@@ -143,7 +143,7 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
                 }
 
                 // 仅缓存 token，不打印 token 明文，避免日志泄露认证凭据。
-                redisTemplate.opsForValue().set(AUTHORIZATION_CACHE_PREFIX + email, accessToken,TimeUnit.SECONDS.toMinutes(120));
+                redisTemplate.opsForValue().set(buildAuthorizationCacheKey(baseUrl, email), accessToken, 120, TimeUnit.MINUTES);
                 log.info("Sub2 账号登录成功并已缓存 token，账号={}，token长度={}", email, accessToken.length());
                 return response;
             } catch (WebClientResponseException e) {
@@ -178,7 +178,7 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
             String email = account.getEmail();
 
             // 采集接口依赖登录阶段写入 Redis 的 token；缺失时跳过当前账号，避免无效请求。
-            String token = redisTemplate.opsForValue().get(AUTHORIZATION_CACHE_PREFIX + email);
+            String token = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, email));
             if (token == null || token.isBlank()) {
                 log.warn("Sub2 可用分组采集跳过账号，Redis 中未找到 token，账号={}，baseUrl={}", email, baseUrl);
                 continue;
@@ -263,7 +263,7 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
         for (Account account : accounts) {
             String email = account.getEmail();
 
-            String token = redisTemplate.opsForValue().get(AUTHORIZATION_CACHE_PREFIX + email);
+            String token = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, email));
             if (token == null || token.isBlank()) {
                 log.warn("Sub2 密钥采集跳过账号，Redis 中未找到 token，账号={}，baseUrl={}", email, baseUrl);
                 continue;
@@ -347,6 +347,13 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
                                 .responseTimeout(Duration.ofSeconds(RESPONSE_TIMEOUT_SECONDS))
                 ))
                 .build();
+    }
+
+    /**
+     * Redis key 统一包含平台、用途、平台地址和账号标识，避免不同平台或同名账号互相覆盖。
+     */
+    private String buildAuthorizationCacheKey(String baseUrl, String email) {
+        return AUTHORIZATION_CACHE_PREFIX + baseUrl + ":" + email;
     }
 
     /**
