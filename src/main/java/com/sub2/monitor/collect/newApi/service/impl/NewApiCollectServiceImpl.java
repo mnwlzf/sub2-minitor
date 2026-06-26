@@ -33,6 +33,9 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
 
     private static final String LOGIN_PATH = "/api/user/login";
     private static final String AUTHORIZATION_CACHE_PREFIX = "newapi:authorization:";
+    private static final String COOKIE_CACHE_NAME = "cookie";
+    private static final String NEW_API_USER_CACHE_NAME = "new-api-user";
+    private static final String NEW_API_USER_HEADER = "new-api-user";
     private static final int CONNECT_TIMEOUT_MILLIS = 5000;
     private static final int RESPONSE_TIMEOUT_SECONDS = 10;
     private static final int RETRY_TIMES = 3;
@@ -142,13 +145,20 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
                     continue;
                 }
 
-                // NewApi 没有 access_token 字段，先缓存 Set-Cookie，后续采集接口可直接读取并放入 Cookie 请求头。
+                // NewApi 后续接口需要同时携带 Cookie 和 new-api-user，请求头值分别来自登录响应头和响应体用户 id。
                 String cookie = response.getHeaders() == null ? null : response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
+                Long userId = response.getBody().getData() == null ? null : response.getBody().getData().getId();
                 if (cookie != null && !cookie.isBlank()) {
-                    redisTemplate.opsForValue().set(buildAuthorizationCacheKey(baseUrl, username), cookie, SESSION_CACHE_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+                    redisTemplate.opsForValue().set(buildAuthorizationCacheKey(baseUrl, username, COOKIE_CACHE_NAME), cookie, SESSION_CACHE_TIMEOUT_MINUTES, TimeUnit.MINUTES);
                     log.info("NewApi 账号登录成功并已缓存 Cookie，账号={}，Cookie长度={}", username, cookie.length());
                 } else {
                     log.info("NewApi 账号登录成功但响应头未返回 Set-Cookie，账号={}", username);
+                }
+                if (userId != null) {
+                    redisTemplate.opsForValue().set(buildAuthorizationCacheKey(baseUrl, username, NEW_API_USER_CACHE_NAME), userId.toString(), SESSION_CACHE_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+                    log.info("NewApi 账号登录成功并已缓存 {}，账号={}，用户ID={}", NEW_API_USER_HEADER, username, userId);
+                } else {
+                    log.warn("NewApi 账号登录成功但响应体未返回用户ID，账号={}，响应={}", username, response.getBody());
                 }
                 return response;
             } catch (WebClientResponseException e) {
@@ -185,7 +195,7 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
     /**
      * Redis key 统一包含平台、用途、平台地址和账号标识，避免不同平台或同名账号互相覆盖。
      */
-    private String buildAuthorizationCacheKey(String baseUrl, String username) {
-        return AUTHORIZATION_CACHE_PREFIX + baseUrl + ":" + username;
+    private String buildAuthorizationCacheKey(String baseUrl, String username, String headerName) {
+        return AUTHORIZATION_CACHE_PREFIX + headerName + ":" + baseUrl + ":" + username;
     }
 }
