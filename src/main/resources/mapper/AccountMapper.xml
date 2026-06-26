@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sub2.monitor.monitor.mapper.AccountMapper">
+    <!-- 自定义查询示例 -->
+    <select id="selectByUsername" resultType="com.sub2.monitor.monitor.entity.Account">
+        SELECT * FROM accounts WHERE username = #{username}
+    </select>
+
+    <select id="selectByBaseUrl" resultType="com.sub2.monitor.monitor.entity.Account">
+        select a.id,
+               a.username,
+               a.email,
+               a.password,
+               a.platform_id,
+               a.platform_name,
+               a.test_model,
+               a.is_collect
+        from accounts a
+                 left join platform p on a.platform_id = p.id
+        where p.base_url = #{baseUrl};
+    </select>
+
+    <select id="selectNewApiAccounts" resultType="com.sub2.monitor.monitor.entity.Account">
+        select a.id,
+               a.username,
+               a.email,
+               a.password,
+               a.platform_id,
+               a.platform_name,
+               a.test_model,
+               a.is_collect
+        from accounts a
+                 left join platform p on a.platform_id = p.id
+        where p.base_url = #{baseUrl} and upper(p.type)='NEWAPI';
+    </select>
+
+    <select id="selectSub2apiAccounts" resultType="com.sub2.monitor.monitor.entity.Account">
+        select a.id,
+               a.username,
+               a.email,
+               a.password,
+               a.platform_id,
+               a.platform_name,
+               a.test_model,
+               a.is_collect
+        from accounts a
+                 left join platform p on a.platform_id = p.id
+        where p.base_url = #{baseUrl} and upper(p.type)='SUB2API' ;
+    </select>
+</mapper>
