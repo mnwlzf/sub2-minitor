@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sub2.monitor.scheduler.mapper.SchedulerTaskMapper">
+
+    <select id="selectAllTasks" resultType="com.sub2.monitor.scheduler.entity.SchedulerTask">
+        select id,
+               task_name,
+               task_group,
+               task_type,
+               base_url,
+               cron,
+               enabled,
+               notify_enabled,
+               notify_scene_id,
+               notify_trigger,
+               remark,
+               created_at,
+               updated_at
+        from scheduler_task
+        order by id desc
+    </select>
+
+    <select id="selectEnabledTasks" resultType="com.sub2.monitor.scheduler.entity.SchedulerTask">
+        select id,
+               task_name,
+               task_group,
+               task_type,
+               base_url,
+               cron,
+               enabled,
+               notify_enabled,
+               notify_scene_id,
+               notify_trigger,
+               remark,
+               created_at,
+               updated_at
+        from scheduler_task
+        where enabled = 1
+        order by id desc
+    </select>
+</mapper>

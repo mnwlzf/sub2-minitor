@@ -10,5 +10,5 @@ public interface NewApiCollectService {
 
     NewApiGroupsResponse collectGroups(String baseUrl);
 
-    NewApiTokensResponse collectTokens(String baseUrl);
+    NewApiTokensResponse collectNewApiKeys(String baseUrl);
 }

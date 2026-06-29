@@ -262,7 +262,7 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
     }
 
     @Override
-    public NewApiTokensResponse collectTokens(String baseUrl) {
+    public NewApiTokensResponse collectNewApiKeys(String baseUrl) {
         List<Account> accounts = accountMapper.selectNewApiAccounts(baseUrl);
         if (accounts.isEmpty()) {
             log.info("没有需要采集令牌的 NewApi 账号 (baseUrl={})", baseUrl);
