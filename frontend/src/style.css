@@ -267,6 +267,254 @@ body,
   margin: 18px 0 20px;
 }
 
+.task-panel {
+  overflow: hidden;
+}
+
+.task-panel .el-card__header {
+  padding: 18px 24px;
+}
+
+.task-panel .el-card__body {
+  padding: 22px 24px;
+}
+
+.task-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 38px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.task-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.task-search {
+  width: 320px;
+}
+
+.task-group-filter {
+  width: 160px;
+}
+
+.task-table {
+  --el-table-header-text-color: #7b8798;
+  --el-table-text-color: #334155;
+  font-size: 14px;
+}
+
+.task-table .el-table__header th {
+  height: 42px;
+  font-weight: 700;
+}
+
+.task-table .el-table__row {
+  height: 44px;
+}
+
+.task-table .el-button + .el-button {
+  margin-left: 10px;
+}
+
+.task-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  padding-top: 18px;
+  color: #667085;
+}
+
+.platform-panel {
+  overflow: hidden;
+}
+
+.platform-panel .el-card__header {
+  padding: 18px 24px;
+}
+
+.platform-panel .el-card__body {
+  padding: 0;
+}
+
+.platform-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 38px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.platform-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex: 1;
+}
+
+.platform-search {
+  width: 320px;
+}
+
+.platform-status-filter {
+  width: 150px;
+}
+
+.platform-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 24px;
+  border-bottom: 1px solid #e5edf6;
+}
+
+.summary-title,
+.summary-sub,
+.platform-url,
+.account-placeholder span {
+  color: #667085;
+}
+
+.summary-line {
+  display: flex;
+  gap: 16px;
+  margin: 8px 0 4px;
+  color: #172033;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.platform-list {
+  display: grid;
+  gap: 16px;
+  padding: 20px 24px 24px;
+}
+
+.platform-item {
+  padding: 20px;
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.platform-item-head,
+.platform-name-line,
+.platform-title,
+.platform-actions {
+  display: flex;
+  align-items: center;
+}
+
+.platform-item-head {
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.platform-title {
+  gap: 14px;
+  min-width: 0;
+}
+
+.platform-avatar {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  background: #eaf2ff;
+  color: #2563eb;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.platform-name-line {
+  gap: 8px;
+  min-width: 0;
+}
+
+.platform-name {
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.platform-url {
+  margin-top: 4px;
+}
+
+.platform-actions {
+  gap: 12px;
+  color: #475467;
+  white-space: nowrap;
+}
+
+.platform-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.metric-box {
+  padding: 14px 16px;
+  border-radius: 6px;
+  background: #f8fbff;
+}
+
+.metric-box span {
+  display: block;
+  color: #667085;
+  margin-bottom: 8px;
+}
+
+.metric-box strong {
+  color: #0f172a;
+  font-size: 20px;
+}
+
+.metric-box strong.danger {
+  color: #ef4444;
+}
+
+.platform-account {
+  margin-top: 18px;
+}
+
+.account-section-title {
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.account-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #e5edf6;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
 @media (max-width: 1100px) {
   .layout,
   .hero-grid,
@@ -277,6 +525,28 @@ body,
   .sidebar {
     border-right: 0;
     border-bottom: 1px solid rgba(215, 223, 235, 0.9);
+  }
+
+  .task-panel-head,
+  .task-toolbar,
+  .platform-panel-head,
+  .platform-toolbar,
+  .platform-item-head,
+  .platform-actions,
+  .platform-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .task-search,
+  .task-group-filter,
+  .platform-search,
+  .platform-status-filter {
+    width: 100%;
+  }
+
+  .platform-metrics {
+    grid-template-columns: 1fr;
   }
 }
 

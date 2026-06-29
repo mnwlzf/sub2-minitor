@@ -1,37 +1,46 @@
 <template>
   <AppShell
-    title="定时任务"
-    subtitle="维护 Quartz 任务定义，支持新增、编辑、启停、手动执行和同步。"
+    title="定时任务 / 任务编辑"
+    subtitle="默认分页展示全部定时任务，支持搜索、新增、编辑、启停和执行预览。"
   >
-    <template #actions>
-      <el-button :loading="loading" @click="loadTasks">刷新</el-button>
-      <el-button @click="handleSync">同步任务</el-button>
-      <el-button type="primary" @click="openCreate">新增任务</el-button>
-    </template>
-
     <el-card shadow="never" class="task-panel">
       <template #header>
-        <div class="panel-head">
+        <div class="task-panel-head">
           <span>任务列表</span>
-          <span>共 {{ taskList.length }} 条</span>
+          <div class="task-toolbar">
+            <el-input
+              v-model="filters.keyword"
+              clearable
+              placeholder="搜索任务名称 / 标识"
+              class="task-search"
+              @keyup.enter="handleSearch"
+            />
+            <el-select v-model="filters.group" clearable placeholder="任务分组" class="task-group-filter">
+              <el-option v-for="group in groupOptions" :key="group" :label="group" :value="group" />
+            </el-select>
+            <el-button type="primary" @click="handleSearch">搜索</el-button>
+            <el-button type="success" @click="openCreate">新增定时任务</el-button>
+          </div>
         </div>
       </template>
 
-      <el-table :data="taskList" v-loading="loading" stripe>
-        <el-table-column prop="taskName" label="任务名称" min-width="160" />
-        <el-table-column prop="taskGroup" label="分组" width="120" />
-        <el-table-column prop="taskType" label="类型" width="160">
+      <el-table :data="pagedTasks" v-loading="loading" class="task-table">
+        <el-table-column prop="taskName" label="任务标识" min-width="180" show-overflow-tooltip />
+        <el-table-column label="任务名称" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">
             {{ taskTypeLabel(row.taskType) }}
           </template>
         </el-table-column>
-        <el-table-column prop="baseUrl" label="地址" min-width="220" />
-        <el-table-column prop="cron" label="Cron" min-width="180" />
-        <el-table-column label="通知" width="160">
+        <el-table-column prop="taskGroup" label="分组" width="120" />
+        <el-table-column prop="cron" label="Cron" min-width="160" show-overflow-tooltip />
+        <el-table-column label="通知场景" min-width="170" show-overflow-tooltip>
           <template #default="{ row }">
-            <el-tag :type="row.notifyEnabled === 1 ? 'primary' : 'info'" size="small">
-              {{ row.notifyEnabled === 1 ? notifySceneLabel(row.notifySceneId) : '未配置' }}
-            </el-tag>
+            {{ row.notifyEnabled === 1 ? notifySceneLabel(row.notifySceneId) : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="执行类" min-width="260" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ executionClass(row.taskType) }}
           </template>
         </el-table-column>
         <el-table-column label="状态" width="100">
@@ -41,22 +50,32 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="180" />
-        <el-table-column label="操作" width="300" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button link type="success" @click="handleTrigger(row)">执行</el-button>
+            <el-button size="small" type="primary" @click="openEdit(row)">编辑</el-button>
+            <el-button size="small" type="success" @click="handleTrigger(row)">执行</el-button>
             <el-button
-              link
+              size="small"
               :type="row.enabled === 1 ? 'warning' : 'success'"
               @click="handleToggle(row)"
             >
               {{ row.enabled === 1 ? '停用' : '启用' }}
             </el-button>
-            <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button size="small" type="danger" plain @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="task-pagination">
+        <span>Total {{ filteredTasks.length }}</span>
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :total="filteredTasks.length"
+          :page-sizes="[10, 20, 50]"
+          layout="sizes, prev, pager, next"
+        />
+      </div>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="760px" destroy-on-close>
@@ -151,7 +170,6 @@ import {
   pauseSchedulerTask,
   resumeSchedulerTask,
   schedulerTaskTypeOptions,
-  syncSchedulerTasks,
   triggerSchedulerTask,
   updateSchedulerTask,
 } from '../api/scheduler'
@@ -162,6 +180,14 @@ const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
 const taskList = ref<SchedulerTask[]>([])
 const formRef = ref<FormInstance>()
+const filters = reactive({
+  keyword: '',
+  group: '',
+})
+const pagination = reactive({
+  page: 1,
+  pageSize: 20,
+})
 
 const defaultForm: SchedulerTaskForm = {
   taskName: '',
@@ -208,6 +234,24 @@ const notifySceneOptions = [
 ]
 
 const dialogTitle = computed(() => (editingId.value ? '编辑任务' : '新增任务'))
+const groupOptions = computed(() => {
+  return Array.from(new Set(taskList.value.map((item) => item.taskGroup).filter(Boolean)))
+})
+const filteredTasks = computed(() => {
+  const keyword = filters.keyword.trim().toLowerCase()
+  return taskList.value.filter((task) => {
+    const matchKeyword =
+      !keyword ||
+      task.taskName.toLowerCase().includes(keyword) ||
+      taskTypeLabel(task.taskType).toLowerCase().includes(keyword)
+    const matchGroup = !filters.group || task.taskGroup === filters.group
+    return matchKeyword && matchGroup
+  })
+})
+const pagedTasks = computed(() => {
+  const start = (pagination.page - 1) * pagination.pageSize
+  return filteredTasks.value.slice(start, start + pagination.pageSize)
+})
 const enabledSwitch = computed({
   get: () => formState.enabled === 1,
   set: (value: boolean) => {
@@ -229,11 +273,18 @@ const loadTasks = async () => {
   loading.value = true
   try {
     taskList.value = await listSchedulerTasks()
+    if ((pagination.page - 1) * pagination.pageSize >= taskList.value.length) {
+      pagination.page = 1
+    }
   } catch (error) {
     ElMessage.error('加载任务列表失败')
   } finally {
     loading.value = false
   }
+}
+
+const handleSearch = () => {
+  pagination.page = 1
 }
 
 const resetForm = () => {
@@ -325,16 +376,6 @@ const handleToggle = async (row: SchedulerTask) => {
   }
 }
 
-const handleSync = async () => {
-  try {
-    await syncSchedulerTasks()
-    ElMessage.success('已同步任务')
-    await loadTasks()
-  } catch (error) {
-    ElMessage.error('同步任务失败')
-  }
-}
-
 const taskTypeLabel = (value: string) => {
   return taskTypeOptions.find((item) => item.value === value)?.label ?? value
 }
@@ -344,6 +385,18 @@ const notifySceneLabel = (value?: number | null) => {
     return '未配置'
   }
   return notifySceneOptions.find((item) => item.value === value)?.label ?? `场景 ${value}`
+}
+
+const executionClass = (taskType: string) => {
+  const classMap: Record<string, string> = {
+    SUB2_LOGIN: 'com.sub2.monitor.scheduler.job.Sub2LoginJob',
+    SUB2_GROUPS: 'com.sub2.monitor.scheduler.job.Sub2GroupsJob',
+    SUB2_KEYS: 'com.sub2.monitor.scheduler.job.Sub2KeysJob',
+    NEWAPI_LOGIN: 'com.sub2.monitor.scheduler.job.NewApiLoginJob',
+    NEWAPI_GROUPS: 'com.sub2.monitor.scheduler.job.NewApiGroupsJob',
+    NEWAPI_TOKENS: 'com.sub2.monitor.scheduler.job.NewApiTokensJob',
+  }
+  return classMap[taskType] ?? 'com.sub2.monitor.scheduler.job.CollectJob'
 }
 
 onMounted(loadTasks)

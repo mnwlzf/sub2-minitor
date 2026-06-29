@@ -11,6 +11,7 @@
 
       <el-menu :default-active="activeMenu" class="nav-menu" router>
         <el-menu-item index="/overview">监控总览</el-menu-item>
+        <el-menu-item index="/platforms">平台管理</el-menu-item>
         <el-menu-item index="/scheduler/tasks">定时任务</el-menu-item>
       </el-menu>
 
@@ -59,6 +60,9 @@ defineProps<{
 const route = useRoute()
 
 const activeMenu = computed(() => {
+  if (route.path.startsWith('/platforms')) {
+    return '/platforms'
+  }
   if (route.path.startsWith('/scheduler/tasks')) {
     return '/scheduler/tasks'
   }
