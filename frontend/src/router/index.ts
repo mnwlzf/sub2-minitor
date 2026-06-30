@@ -3,6 +3,7 @@ import OverviewView from '../views/OverviewView.vue'
 import PlatformView from '../views/PlatformView.vue'
 import SchedulerTaskView from '../views/SchedulerTaskView.vue'
 import GroupView from '../views/GroupView.vue'
+import BalanceView from '../views/BalanceView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -30,6 +31,11 @@ const router = createRouter({
       path: '/groups',
       name: 'groups',
       component: GroupView,
+    },
+    {
+      path: '/balances',
+      name: 'balances',
+      component: BalanceView,
     },
   ],
 })

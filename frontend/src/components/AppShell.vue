@@ -18,7 +18,7 @@
           <el-icon><Grid /></el-icon>
           <span>平台管理</span>
         </el-menu-item>
-        <el-menu-item index="/balances" disabled>
+        <el-menu-item index="/balances">
           <el-icon><TrendCharts /></el-icon>
           <span>余额查看</span>
         </el-menu-item>
@@ -89,6 +89,9 @@ const route = useRoute()
 const activeMenu = computed(() => {
   if (route.path.startsWith('/platforms')) {
     return '/platforms'
+  }
+  if (route.path.startsWith('/balances')) {
+    return '/balances'
   }
   if (route.path.startsWith('/scheduler/tasks')) {
     return '/scheduler/tasks'
