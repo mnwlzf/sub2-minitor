@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import OverviewView from '../views/OverviewView.vue'
 import PlatformView from '../views/PlatformView.vue'
 import SchedulerTaskView from '../views/SchedulerTaskView.vue'
+import GroupView from '../views/GroupView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -24,6 +25,11 @@ const router = createRouter({
       path: '/scheduler/tasks',
       name: 'scheduler-tasks',
       component: SchedulerTaskView,
+    },
+    {
+      path: '/groups',
+      name: 'groups',
+      component: GroupView,
     },
   ],
 })

@@ -12,6 +12,17 @@ export interface PlatformItem {
   arrivalAmount?: number
   abnormalCount?: number
   lastCollectedAt?: string | null
+  groupCount?: number
+  collectSuccessCount?: number
+  collectFailureCount?: number
+  groups?: PlatformGroup[]
+}
+
+export interface PlatformGroup {
+  groupName: string
+  description?: string | null
+  rateMultiplier?: number | null
+  status?: string | null
 }
 
 export interface PlatformSummary {

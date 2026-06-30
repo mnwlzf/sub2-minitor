@@ -47,10 +47,30 @@ CREATE TABLE IF NOT EXISTS `collect_snapshot` (
   `payload_json` json DEFAULT NULL COMMENT '采集响应JSON',
   `collected_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '采集时间',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_collect_snapshot_platform_type` (`platform_id`, `collect_type`),
   KEY `idx_collect_snapshot_platform` (`platform_id`),
   KEY `idx_collect_snapshot_type` (`platform_type`, `collect_type`),
   KEY `idx_collect_snapshot_collected_at` (`collected_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采集结果快照表';
+
+CREATE TABLE IF NOT EXISTS `collect_group` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `platform_id` bigint NOT NULL COMMENT '平台ID',
+  `platform_type` varchar(32) NOT NULL COMMENT '平台类型：SUB2API、NEWAPI',
+  `base_url` varchar(255) NOT NULL COMMENT '平台基础地址',
+  `group_name` varchar(128) NOT NULL COMMENT '分组名称',
+  `description` varchar(500) DEFAULT NULL COMMENT '分组描述',
+  `rate_multiplier` decimal(18,8) DEFAULT NULL COMMENT '倍率：Sub2 rate_multiplier，NewApi ratio',
+  `status` varchar(32) DEFAULT NULL COMMENT '分组状态',
+  `raw_json` json DEFAULT NULL COMMENT '分组原始JSON',
+  `last_collected_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '最近采集时间',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_collect_group_platform_name` (`platform_id`, `group_name`),
+  KEY `idx_collect_group_platform` (`platform_id`),
+  KEY `idx_collect_group_type` (`platform_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采集分组当前状态表';
 
 ALTER TABLE `mail_smtp_config`
   COMMENT = 'SMTP配置表',

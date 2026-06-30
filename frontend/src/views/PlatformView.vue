@@ -89,9 +89,41 @@
 
           <div class="platform-account">
             <div class="account-section-title">账号明细</div>
-            <div class="account-placeholder">
-              <span>最近采集</span>
-              <strong>{{ platform.lastCollectedAt ? formatDate(platform.lastCollectedAt) : '未采集' }}</strong>
+            <div class="account-card">
+              <div class="account-main">
+                <div class="account-avatar">{{ platform.groupCount ? platform.groupCount : '-' }}</div>
+                <div class="account-info">
+                  <div class="account-title-line">
+                    <span class="account-name">分组数据</span>
+                    <span class="account-time">{{ platform.lastCollectedAt ? formatDate(platform.lastCollectedAt) : '未采集' }}</span>
+                  </div>
+                  <div class="account-subline">
+                    {{ platform.collectSuccessCount ?? 0 }} 个采集项成功，{{ platform.collectFailureCount ?? 0 }} 个失败
+                  </div>
+                  <div v-if="platform.groups?.length" class="group-tags">
+                    <el-tag
+                      v-for="group in platform.groups"
+                      :key="group.groupName"
+                      size="small"
+                      type="warning"
+                      effect="light"
+                    >
+                      {{ group.groupName }} / {{ formatRate(group.rateMultiplier) }}
+                    </el-tag>
+                  </div>
+                  <div v-else class="account-subline">暂无分组数据</div>
+                </div>
+              </div>
+              <div class="account-stats">
+                <div>
+                  <span>分组数</span>
+                  <strong>{{ platform.groupCount ?? 0 }}</strong>
+                </div>
+                <div>
+                  <span>采集失败</span>
+                  <strong :class="{ danger: (platform.collectFailureCount ?? 0) > 0 }">{{ platform.collectFailureCount ?? 0 }}</strong>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -264,6 +296,7 @@ const collectAll = async () => {
 }
 
 const formatMoney = (value?: number) => Number(value ?? 0).toFixed(2)
+const formatRate = (value?: number | null) => Number(value ?? 0).toFixed(4)
 const platformAvatar = (name: string) => name?.slice(0, 1) || 'P'
 const formatDate = (value: string) => value.replace('T', ' ').slice(0, 16)
 

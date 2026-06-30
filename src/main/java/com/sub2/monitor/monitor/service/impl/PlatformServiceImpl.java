@@ -2,6 +2,10 @@ package com.sub2.monitor.monitor.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.sub2.monitor.collect.entity.CollectGroup;
+import com.sub2.monitor.collect.entity.CollectSnapshot;
+import com.sub2.monitor.collect.mapper.CollectGroupMapper;
+import com.sub2.monitor.collect.mapper.CollectSnapshotMapper;
 import com.sub2.monitor.collect.service.PlatformCollectBizService;
 import com.sub2.monitor.monitor.dto.PlatformSummaryResponse;
 import com.sub2.monitor.monitor.entity.Account;
@@ -14,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -21,6 +26,8 @@ import java.util.List;
 public class PlatformServiceImpl extends ServiceImpl<PlatformMapper, Platform> implements PlatformService {
 
     private final AccountMapper accountMapper;
+    private final CollectSnapshotMapper collectSnapshotMapper;
+    private final CollectGroupMapper collectGroupMapper;
     private final PlatformCollectBizService platformCollectBizService;
 
     @Override
@@ -100,6 +107,28 @@ public class PlatformServiceImpl extends ServiceImpl<PlatformMapper, Platform> i
     private PlatformSummaryResponse.PlatformItem toPlatformItem(Platform platform) {
         Long accountCount = accountMapper.selectCount(new LambdaQueryWrapper<Account>()
                 .eq(Account::getPlatformId, platform.getId()));
+        List<CollectSnapshot> snapshots = collectSnapshotMapper.selectList(new LambdaQueryWrapper<CollectSnapshot>()
+                .eq(CollectSnapshot::getPlatformId, platform.getId()));
+        Long groupCount = collectGroupMapper.selectCount(new LambdaQueryWrapper<CollectGroup>()
+                .eq(CollectGroup::getPlatformId, platform.getId()));
+        List<PlatformSummaryResponse.GroupItem> groups = collectGroupMapper.selectList(new LambdaQueryWrapper<CollectGroup>()
+                        .eq(CollectGroup::getPlatformId, platform.getId())
+                        .orderByAsc(CollectGroup::getGroupName)
+                        .last("limit 8"))
+                .stream()
+                .map(this::toGroupItem)
+                .toList();
+        int collectSuccessCount = (int) snapshots.stream()
+                .filter(snapshot -> snapshot.getSuccess() != null && snapshot.getSuccess() == 1)
+                .count();
+        int collectFailureCount = (int) snapshots.stream()
+                .filter(snapshot -> snapshot.getSuccess() == null || snapshot.getSuccess() != 1)
+                .count();
+        LocalDateTime lastCollectedAt = snapshots.stream()
+                .map(CollectSnapshot::getCollectedAt)
+                .filter(time -> time != null)
+                .max(LocalDateTime::compareTo)
+                .orElse(null);
 
         PlatformSummaryResponse.PlatformItem item = new PlatformSummaryResponse.PlatformItem();
         item.setId(platform.getId());
@@ -113,8 +142,21 @@ public class PlatformServiceImpl extends ServiceImpl<PlatformMapper, Platform> i
         item.setActualConsumption(BigDecimal.ZERO);
         item.setRechargeAmount(BigDecimal.ZERO);
         item.setArrivalAmount(BigDecimal.ZERO);
-        item.setAbnormalCount(0);
-        item.setLastCollectedAt(null);
+        item.setAbnormalCount(collectFailureCount);
+        item.setLastCollectedAt(lastCollectedAt);
+        item.setGroupCount(groupCount.intValue());
+        item.setCollectSuccessCount(collectSuccessCount);
+        item.setCollectFailureCount(collectFailureCount);
+        item.setGroups(groups);
+        return item;
+    }
+
+    private PlatformSummaryResponse.GroupItem toGroupItem(CollectGroup group) {
+        PlatformSummaryResponse.GroupItem item = new PlatformSummaryResponse.GroupItem();
+        item.setGroupName(group.getGroupName());
+        item.setDescription(group.getDescription());
+        item.setRateMultiplier(group.getRateMultiplier());
+        item.setStatus(group.getStatus());
         return item;
     }
 

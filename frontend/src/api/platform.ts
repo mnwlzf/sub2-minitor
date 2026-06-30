@@ -29,5 +29,5 @@ export const disablePlatform = async (id: number) => {
 }
 
 export const collectPlatform = async (id: number) => {
-  await http.post(`/monitor/platforms/${id}/collect`)
+  await http.post(`/monitor/platforms/${id}/collect`, undefined, { timeout: 120000 })
 }

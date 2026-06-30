@@ -28,6 +28,18 @@ public class PlatformSummaryResponse {
         private BigDecimal arrivalAmount;
         private Integer abnormalCount;
         private LocalDateTime lastCollectedAt;
+        private Integer groupCount;
+        private Integer collectSuccessCount;
+        private Integer collectFailureCount;
+        private List<GroupItem> groups;
+    }
+
+    @Data
+    public static class GroupItem {
+        private String groupName;
+        private String description;
+        private BigDecimal rateMultiplier;
+        private String status;
     }
 
     @Data
