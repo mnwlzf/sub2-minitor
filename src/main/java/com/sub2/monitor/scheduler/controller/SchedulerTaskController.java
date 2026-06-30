@@ -2,6 +2,7 @@ package com.sub2.monitor.scheduler.controller;
 
 import com.sub2.monitor.scheduler.entity.SchedulerTask;
 import com.sub2.monitor.scheduler.service.SchedulerTaskService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,13 +16,10 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/scheduler/tasks")
+@RequiredArgsConstructor
 public class SchedulerTaskController {
 
     private final SchedulerTaskService schedulerTaskService;
-
-    public SchedulerTaskController(SchedulerTaskService schedulerTaskService) {
-        this.schedulerTaskService = schedulerTaskService;
-    }
 
     @GetMapping
     public List<SchedulerTask> listTasks() {

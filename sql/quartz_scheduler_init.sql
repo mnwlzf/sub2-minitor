@@ -137,7 +137,7 @@ CREATE TABLE IF NOT EXISTS `scheduler_task` (
   `task_name` varchar(100) NOT NULL,
   `task_group` varchar(64) NOT NULL DEFAULT 'monitor',
   `task_type` varchar(64) NOT NULL,
-  `base_url` varchar(255) NOT NULL,
+  `base_url` varchar(255) NOT NULL DEFAULT '',
   `cron` varchar(64) NOT NULL,
   `enabled` tinyint NOT NULL DEFAULT 1,
   `remark` varchar(255) DEFAULT NULL,
@@ -147,8 +147,16 @@ CREATE TABLE IF NOT EXISTS `scheduler_task` (
   UNIQUE KEY `uk_scheduler_task_name_group` (`task_name`,`task_group`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+DELETE FROM `scheduler_task`
+WHERE `task_type` IN (
+  'SUB2_LOGIN',
+  'SUB2_GROUPS',
+  'SUB2_KEYS',
+  'NEWAPI_LOGIN',
+  'NEWAPI_GROUPS',
+  'NEWAPI_TOKENS'
+);
+
 INSERT INTO `scheduler_task` (`task_name`, `task_group`, `task_type`, `base_url`, `cron`, `enabled`, `remark`)
 VALUES
-('sub2-login', 'monitor', 'SUB2_LOGIN', 'https://codex.trovebox.online', '0 */30 * * * ?', 0, '示例：Sub2 登录刷新'),
-('sub2-groups', 'monitor', 'SUB2_GROUPS', 'https://codex.trovebox.online', '0 0 */1 * * ?', 0, '示例：Sub2 分组采集'),
-('newapi-login', 'monitor', 'NEWAPI_LOGIN', 'https://ggniao.com', '0 */30 * * * ?', 0, '示例：NewApi 登录刷新');
+('data-collect', 'monitor', 'DATA_COLLECT', '', '0 */30 * * * ?', 0, '示例：数据采集');

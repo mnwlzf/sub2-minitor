@@ -21,6 +21,4 @@ public interface SchedulerTaskService {
     void triggerTask(Long id);
 
     void syncAllEnabledTasks();
-
-    void executeTask(Long id);
 }

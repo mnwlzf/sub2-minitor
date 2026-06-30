@@ -1,6 +1,6 @@
 package com.sub2.monitor.scheduler.job;
 
-import com.sub2.monitor.scheduler.service.SchedulerTaskService;
+import com.sub2.monitor.scheduler.service.SchedulerTaskExecuteService;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
@@ -16,14 +16,14 @@ public class CollectJob implements Job {
     public static final String TASK_ID = "taskId";
 
     @Autowired
-    private SchedulerTaskService schedulerTaskService;
+    private SchedulerTaskExecuteService schedulerTaskExecuteService;
 
     @Override
     public void execute(JobExecutionContext context) throws JobExecutionException {
         JobDataMap jobDataMap = context.getMergedJobDataMap();
         Long taskId = jobDataMap.getLong(TASK_ID);
         try {
-            schedulerTaskService.executeTask(taskId);
+            schedulerTaskExecuteService.executeTask(taskId);
         } catch (Exception e) {
             log.error("Quartz 执行任务失败，taskId={}", taskId, e);
             throw new JobExecutionException(e);

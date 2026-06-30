@@ -2,12 +2,7 @@ import { http } from './http'
 import type { SchedulerTask, SchedulerTaskForm, SchedulerTaskOption } from '../types/scheduler'
 
 export const schedulerTaskTypeOptions: SchedulerTaskOption[] = [
-  { label: 'Sub2 登录', value: 'SUB2_LOGIN' },
-  { label: 'Sub2 分组采集', value: 'SUB2_GROUPS' },
-  { label: 'Sub2 Key 采集', value: 'SUB2_KEYS' },
-  { label: 'NewApi 登录', value: 'NEWAPI_LOGIN' },
-  { label: 'NewApi 分组采集', value: 'NEWAPI_GROUPS' },
-  { label: 'NewApi Token 采集', value: 'NEWAPI_TOKENS' },
+  { label: '数据采集', value: 'DATA_COLLECT' },
 ]
 
 export const listSchedulerTasks = async () => {

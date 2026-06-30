@@ -190,9 +190,9 @@ const pagination = reactive({
 })
 
 const defaultForm: SchedulerTaskForm = {
-  taskName: '',
+  taskName: 'data-collect',
   taskGroup: 'monitor',
-  taskType: 'SUB2_LOGIN',
+  taskType: 'DATA_COLLECT',
   baseUrl: '',
   cron: '0 */30 * * * ?',
   enabled: 1,
@@ -208,7 +208,6 @@ const rules: FormRules<SchedulerTaskForm> = {
   taskName: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
   taskGroup: [{ required: true, message: '请输入任务分组', trigger: 'blur' }],
   taskType: [{ required: true, message: '请选择任务类型', trigger: 'change' }],
-  baseUrl: [{ required: true, message: '请输入目标地址', trigger: 'blur' }],
   cron: [{ required: true, message: '请输入 Cron 表达式', trigger: 'blur' }],
   notifySceneId: [
     {
@@ -389,12 +388,7 @@ const notifySceneLabel = (value?: number | null) => {
 
 const executionClass = (taskType: string) => {
   const classMap: Record<string, string> = {
-    SUB2_LOGIN: 'com.sub2.monitor.scheduler.job.Sub2LoginJob',
-    SUB2_GROUPS: 'com.sub2.monitor.scheduler.job.Sub2GroupsJob',
-    SUB2_KEYS: 'com.sub2.monitor.scheduler.job.Sub2KeysJob',
-    NEWAPI_LOGIN: 'com.sub2.monitor.scheduler.job.NewApiLoginJob',
-    NEWAPI_GROUPS: 'com.sub2.monitor.scheduler.job.NewApiGroupsJob',
-    NEWAPI_TOKENS: 'com.sub2.monitor.scheduler.job.NewApiTokensJob',
+    DATA_COLLECT: 'com.sub2.monitor.scheduler.job.CollectJob',
   }
   return classMap[taskType] ?? 'com.sub2.monitor.scheduler.job.CollectJob'
 }

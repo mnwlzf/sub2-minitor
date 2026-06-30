@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS `scheduler_task` (
   `task_name` varchar(100) NOT NULL COMMENT '任务名称，同一任务分组内唯一',
   `task_group` varchar(64) NOT NULL DEFAULT 'monitor' COMMENT 'Quartz任务分组',
   `task_type` varchar(64) NOT NULL COMMENT '任务类型，对应SchedulerTaskType枚举',
-  `base_url` varchar(255) NOT NULL COMMENT '采集平台基础地址',
+  `base_url` varchar(255) NOT NULL DEFAULT '' COMMENT '采集平台基础地址，数据采集任务可为空',
   `cron` varchar(64) NOT NULL COMMENT 'Quartz Cron表达式',
   `enabled` tinyint NOT NULL DEFAULT 1 COMMENT '是否启用：1启用，0停用',
   `notify_enabled` tinyint NOT NULL DEFAULT 0 COMMENT '是否启用任务通知：1启用，0停用',
@@ -21,14 +21,19 @@ CREATE TABLE IF NOT EXISTS `scheduler_task` (
   KEY `idx_scheduler_task_notify_scene` (`notify_scene_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='定时任务业务配置表';
 
+DELETE FROM `scheduler_task`
+WHERE `task_type` IN (
+  'SUB2_LOGIN',
+  'SUB2_GROUPS',
+  'SUB2_KEYS',
+  'NEWAPI_LOGIN',
+  'NEWAPI_GROUPS',
+  'NEWAPI_TOKENS'
+);
+
 INSERT INTO `scheduler_task` (`task_name`, `task_group`, `task_type`, `base_url`, `cron`, `enabled`, `notify_enabled`, `notify_scene_id`, `notify_trigger`, `remark`)
 VALUES
-('sub2-login', 'monitor', 'SUB2_LOGIN', 'https://codex.trovebox.online', '0 */30 * * * ?', 0, 0, NULL, 'FAILURE', 'Sub2 登录刷新'),
-('sub2-groups', 'monitor', 'SUB2_GROUPS', 'https://codex.trovebox.online', '0 0 */1 * * ?', 0, 0, NULL, 'FAILURE', 'Sub2 分组采集'),
-('sub2-keys', 'monitor', 'SUB2_KEYS', 'https://codex.trovebox.online', '0 0/20 * * * ?', 0, 0, NULL, 'FAILURE', 'Sub2 Key 采集'),
-('newapi-login', 'monitor', 'NEWAPI_LOGIN', 'https://ggniao.com', '0 */30 * * * ?', 0, 0, NULL, 'FAILURE', 'NewApi 登录刷新'),
-('newapi-groups', 'monitor', 'NEWAPI_GROUPS', 'https://ggniao.com', '0 0/15 * * * ?', 0, 0, NULL, 'FAILURE', 'NewApi 分组采集'),
-('newapi-tokens', 'monitor', 'NEWAPI_TOKENS', 'https://ggniao.com', '0 0/20 * * * ?', 0, 0, NULL, 'FAILURE', 'NewApi Token 采集')
+('data-collect', 'monitor', 'DATA_COLLECT', '', '0 */30 * * * ?', 0, 0, NULL, 'FAILURE', '数据采集')
 ON DUPLICATE KEY UPDATE
   `task_type` = VALUES(`task_type`),
   `base_url` = VALUES(`base_url`),
