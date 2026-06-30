@@ -4,6 +4,7 @@ import com.sub2.monitor.collect.common.dto.LoginResponse;
 import com.sub2.monitor.collect.sub2api.dto.Sub2AvailableGroupsResponse;
 import com.sub2.monitor.collect.sub2api.dto.Sub2KeysResponse;
 import com.sub2.monitor.collect.sub2api.dto.Sub2LoginRes;
+import com.sub2.monitor.collect.sub2api.dto.Sub2UsageStatsResponse;
 
 public interface Sub2CollectService {
 
@@ -15,4 +16,6 @@ public interface Sub2CollectService {
 
 
     Sub2KeysResponse collectSub2Keys(String baseUrl);
+
+    Sub2UsageStatsResponse collectUsageStats(String baseUrl);
 }

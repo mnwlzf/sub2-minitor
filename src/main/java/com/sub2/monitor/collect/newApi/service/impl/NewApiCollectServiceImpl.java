@@ -6,6 +6,7 @@ import com.sub2.monitor.collect.newApi.dto.NewApiLoginReq;
 import com.sub2.monitor.collect.newApi.dto.NewApiLoginRes;
 import com.sub2.monitor.collect.newApi.dto.NewApiRawGroupsResponse;
 import com.sub2.monitor.collect.newApi.dto.NewApiTokensResponse;
+import com.sub2.monitor.collect.newApi.dto.NewApiUserSelfResponse;
 import com.sub2.monitor.collect.newApi.service.NewApiCollectService;
 import com.sub2.monitor.monitor.entity.Account;
 import com.sub2.monitor.monitor.mapper.AccountMapper;
@@ -38,6 +39,7 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
 
     private static final String LOGIN_PATH = "/api/user/login";
     private static final String GROUPS_PATH = "/api/user/self/groups";
+    private static final String USER_SELF_PATH = "/api/user/self";
     private static final String TOKENS_PATH = "/api/token/?p=1&size=20";
     private static final String AUTHORIZATION_CACHE_PREFIX = "newapi:authorization:";
     private static final String COOKIE_CACHE_NAME = "cookie";
@@ -340,6 +342,54 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
 
         log.info("NewApi 令牌列表采集任务结束，baseUrl={}，成功数量={}", baseUrl, responses.size());
         return responses.isEmpty() ? null : responses.get(0);
+    }
+
+    @Override
+    public NewApiUserSelfResponse collectUserSelf(String baseUrl) {
+        List<Account> accounts = accountMapper.selectNewApiAccounts(baseUrl);
+        if (accounts.isEmpty()) {
+            log.info("没有需要采集用户余额的 NewApi 账号 (baseUrl={})", baseUrl);
+            return null;
+        }
+
+        WebClient client = buildWebClient(baseUrl);
+        for (Account account : accounts) {
+            String username = account.getUsername();
+            String cookie = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, COOKIE_CACHE_NAME));
+            String newApiUser = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, NEW_API_USER_CACHE_NAME));
+            if (cookie == null || cookie.isBlank() || newApiUser == null || newApiUser.isBlank()) {
+                log.warn("NewApi 用户余额采集跳过账号，Redis 中缺少 Cookie 或 {}，账号={}，baseUrl={}", NEW_API_USER_HEADER, username, baseUrl);
+                continue;
+            }
+
+            WebClient requestClient = client.mutate()
+                    .defaultHeader(HttpHeaders.COOKIE, cookie)
+                    .defaultHeader(NEW_API_USER_HEADER, newApiUser)
+                    .build();
+            try {
+                NewApiUserSelfResponse response = requestClient.get()
+                        .uri(USER_SELF_PATH)
+                        .exchangeToMono(clientResponse -> {
+                            HttpStatusCode status = clientResponse.statusCode();
+                            if (status.is2xxSuccessful()) {
+                                return clientResponse.bodyToMono(NewApiUserSelfResponse.class);
+                            }
+                            return clientResponse.bodyToMono(String.class)
+                                    .flatMap(errorBody -> Mono.error(new RuntimeException(
+                                            "Request failed with status: " + status + ", body: " + errorBody)));
+                        })
+                        .retryWhen(Retry.fixedDelay(RETRY_TIMES, Duration.ofSeconds(RETRY_DELAY_SECONDS)))
+                        .block();
+                if (response != null) {
+                    return response;
+                }
+            } catch (Exception e) {
+                Throwable rootCause = Exceptions.unwrap(e);
+                log.error("NewApi 用户余额采集失败，账号={}，异常类型={}，原因={}",
+                        username, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
+            }
+        }
+        return null;
     }
 
     /**

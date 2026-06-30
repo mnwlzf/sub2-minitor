@@ -3,18 +3,26 @@ package com.sub2.monitor.collect.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sub2.monitor.collect.common.dto.LoginResponse;
+import com.sub2.monitor.collect.entity.AccountBalanceRecord;
 import com.sub2.monitor.collect.entity.CollectGroup;
 import com.sub2.monitor.collect.entity.CollectSnapshot;
+import com.sub2.monitor.collect.mapper.AccountBalanceRecordMapper;
 import com.sub2.monitor.collect.mapper.CollectGroupMapper;
 import com.sub2.monitor.collect.mapper.CollectSnapshotMapper;
 import com.sub2.monitor.collect.newApi.dto.NewApiGroupsResponse;
 import com.sub2.monitor.collect.newApi.dto.NewApiTokensResponse;
+import com.sub2.monitor.collect.newApi.dto.NewApiUserSelfResponse;
 import com.sub2.monitor.collect.newApi.service.NewApiCollectService;
 import com.sub2.monitor.collect.service.PlatformCollectBizService;
 import com.sub2.monitor.collect.sub2api.dto.Sub2AvailableGroupsResponse;
 import com.sub2.monitor.collect.sub2api.dto.Sub2KeysResponse;
+import com.sub2.monitor.collect.sub2api.dto.Sub2LoginRes;
+import com.sub2.monitor.collect.sub2api.dto.Sub2UsageStatsResponse;
 import com.sub2.monitor.collect.sub2api.service.Sub2CollectService;
+import com.sub2.monitor.monitor.entity.Account;
 import com.sub2.monitor.monitor.entity.Platform;
+import com.sub2.monitor.monitor.mapper.AccountMapper;
 import com.sub2.monitor.monitor.mapper.PlatformMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +46,8 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
     private static final String PLATFORM_TYPE_SUB2API = "SUB2API";
 
     private final PlatformMapper platformMapper;
+    private final AccountMapper accountMapper;
+    private final AccountBalanceRecordMapper accountBalanceRecordMapper;
     private final CollectGroupMapper collectGroupMapper;
     private final CollectSnapshotMapper collectSnapshotMapper;
     private final Sub2CollectService sub2CollectService;
@@ -76,6 +86,9 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
 
     private void collectNewApi(Platform platform) {
         newApiCollectService.login(platform.getBaseUrl());
+        NewApiUserSelfResponse userSelfResponse = newApiCollectService.collectUserSelf(platform.getBaseUrl());
+        saveNewApiBalanceRecord(platform, userSelfResponse);
+
         NewApiGroupsResponse groupsResponse = newApiCollectService.collectGroups(platform.getBaseUrl());
         saveSnapshot(platform, "GROUPS", isNewApiSuccess(groupsResponse), countNewApiGroups(groupsResponse),
                 groupsResponse == null ? null : groupsResponse.getMessage(), groupsResponse);
@@ -89,7 +102,10 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
     }
 
     private void collectSub2Api(Platform platform) {
-        sub2CollectService.login(platform.getBaseUrl());
+        LoginResponse<Sub2LoginRes> loginResponse = sub2CollectService.login(platform.getBaseUrl());
+        Sub2UsageStatsResponse usageStatsResponse = sub2CollectService.collectUsageStats(platform.getBaseUrl());
+        saveSub2BalanceRecord(platform, loginResponse, usageStatsResponse);
+
         Sub2AvailableGroupsResponse groupsResponse = sub2CollectService.collectSub2AvailableGroups(platform.getBaseUrl());
         saveSnapshot(platform, "GROUPS", isSub2Success(groupsResponse), countSub2Groups(groupsResponse),
                 groupsResponse == null ? null : groupsResponse.getMessage(), groupsResponse);
@@ -128,6 +144,113 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
                 .skip(1)
                 .map(CollectSnapshot::getId)
                 .forEach(collectSnapshotMapper::deleteById);
+    }
+
+    private void saveSub2BalanceRecord(
+            Platform platform,
+            LoginResponse<Sub2LoginRes> loginResponse,
+            Sub2UsageStatsResponse usageStatsResponse
+    ) {
+        if (loginResponse == null || loginResponse.getBody() == null
+                || loginResponse.getBody().getData() == null
+                || loginResponse.getBody().getData().getUser() == null) {
+            return;
+        }
+        Sub2LoginRes.UserInfo user = loginResponse.getBody().getData().getUser();
+        BigDecimal totalConsumption = usageStatsResponse == null || usageStatsResponse.getData() == null
+                ? null
+                : usageStatsResponse.getData().getTotalActualCost();
+        Account account = findAccount(platform, user.getEmail(), user.getUsername());
+        saveBalanceRecord(platform, account, user.getEmail(), user.getBalance(), totalConsumption);
+    }
+
+    private void saveNewApiBalanceRecord(Platform platform, NewApiUserSelfResponse response) {
+        if (response == null || response.getData() == null || response.getData().getQuota() == null) {
+            return;
+        }
+        NewApiUserSelfResponse.UserInfo user = response.getData();
+        String identity = user.getUsername() != null ? user.getUsername() : user.getEmail();
+        Account account = findAccount(platform, user.getEmail(), user.getUsername());
+        saveBalanceRecord(platform, account, identity, toNewApiAmount(user.getQuota()), toNewApiAmount(user.getUsedQuota()));
+    }
+
+    private void saveBalanceRecord(
+            Platform platform,
+            Account account,
+            String accountIdentity,
+            BigDecimal balance,
+            BigDecimal totalConsumption
+    ) {
+        if (balance == null) {
+            return;
+        }
+        AccountBalanceRecord lastRecord = getLastBalanceRecord(account, platform, accountIdentity);
+        BigDecimal consumptionAmount = calculateConsumptionAmount(lastRecord, totalConsumption);
+        BigDecimal rechargeAmount = calculateRechargeAmount(lastRecord, balance);
+
+        AccountBalanceRecord record = new AccountBalanceRecord();
+        record.setAccountId(account == null ? null : account.getId());
+        record.setPlatformId(platform.getId());
+        record.setPlatformType(normalizeType(platform));
+        record.setBaseUrl(platform.getBaseUrl());
+        record.setAccountIdentity(accountIdentity);
+        record.setBalance(balance);
+        record.setTotalConsumption(totalConsumption);
+        record.setConsumptionAmount(consumptionAmount);
+        record.setRechargeAmount(rechargeAmount);
+        record.setCollectedAt(LocalDateTime.now());
+        accountBalanceRecordMapper.insert(record);
+    }
+
+    private BigDecimal calculateConsumptionAmount(AccountBalanceRecord lastRecord, BigDecimal totalConsumption) {
+        if (lastRecord == null || lastRecord.getTotalConsumption() == null || totalConsumption == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal delta = totalConsumption.subtract(lastRecord.getTotalConsumption());
+        return delta.signum() > 0 ? delta : BigDecimal.ZERO;
+    }
+
+    private BigDecimal calculateRechargeAmount(AccountBalanceRecord lastRecord, BigDecimal balance) {
+        if (lastRecord == null || lastRecord.getBalance() == null || balance == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal delta = balance.subtract(lastRecord.getBalance());
+        return delta.signum() > 0 ? delta : BigDecimal.ZERO;
+    }
+
+    private AccountBalanceRecord getLastBalanceRecord(Account account, Platform platform, String accountIdentity) {
+        LambdaQueryWrapper<AccountBalanceRecord> wrapper = new LambdaQueryWrapper<AccountBalanceRecord>()
+                .eq(AccountBalanceRecord::getPlatformId, platform.getId())
+                .orderByDesc(AccountBalanceRecord::getCollectedAt)
+                .orderByDesc(AccountBalanceRecord::getId)
+                .last("limit 1");
+        if (account != null && account.getId() != null) {
+            wrapper.eq(AccountBalanceRecord::getAccountId, account.getId());
+        } else {
+            wrapper.eq(AccountBalanceRecord::getAccountIdentity, accountIdentity);
+        }
+        return accountBalanceRecordMapper.selectOne(wrapper);
+    }
+
+    private Account findAccount(Platform platform, String email, String username) {
+        LambdaQueryWrapper<Account> wrapper = new LambdaQueryWrapper<Account>()
+                .eq(Account::getPlatformId, platform.getId())
+                .last("limit 1");
+        if (email != null && !email.isBlank()) {
+            wrapper.eq(Account::getEmail, email);
+        } else if (username != null && !username.isBlank()) {
+            wrapper.eq(Account::getUsername, username);
+        } else {
+            return null;
+        }
+        return accountMapper.selectOne(wrapper);
+    }
+
+    private BigDecimal toNewApiAmount(Long quota) {
+        if (quota == null) {
+            return null;
+        }
+        return BigDecimal.valueOf(quota).divide(BigDecimal.valueOf(500000), 8, java.math.RoundingMode.HALF_UP);
     }
 
     private void syncGroups(Platform platform, List<GroupRecord> groupRecords) {

@@ -72,6 +72,24 @@ CREATE TABLE IF NOT EXISTS `collect_group` (
   KEY `idx_collect_group_type` (`platform_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采集分组当前状态表';
 
+CREATE TABLE IF NOT EXISTS `account_balance_record` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `account_id` bigint DEFAULT NULL COMMENT '账号ID',
+  `platform_id` bigint NOT NULL COMMENT '平台ID',
+  `platform_type` varchar(32) NOT NULL COMMENT '平台类型：SUB2API、NEWAPI',
+  `base_url` varchar(255) NOT NULL COMMENT '平台基础地址',
+  `account_identity` varchar(255) DEFAULT NULL COMMENT '账号标识：邮箱或用户名',
+  `balance` decimal(20,8) NOT NULL COMMENT '采集时余额',
+  `total_consumption` decimal(20,8) DEFAULT NULL COMMENT '平台返回的历史累计消耗',
+  `consumption_amount` decimal(20,8) NOT NULL DEFAULT 0 COMMENT '本次累计消耗增量',
+  `recharge_amount` decimal(20,8) NOT NULL DEFAULT 0 COMMENT '本次余额增加量，计入充值/到账',
+  `collected_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '采集时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_balance_record_account` (`account_id`),
+  KEY `idx_balance_record_platform` (`platform_id`),
+  KEY `idx_balance_record_collected_at` (`collected_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='账号余额采集记录表';
+
 ALTER TABLE `mail_smtp_config`
   COMMENT = 'SMTP配置表',
   MODIFY COLUMN `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',

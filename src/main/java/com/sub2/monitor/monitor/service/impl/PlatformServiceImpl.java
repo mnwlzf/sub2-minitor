@@ -2,8 +2,10 @@ package com.sub2.monitor.monitor.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.sub2.monitor.collect.entity.AccountBalanceRecord;
 import com.sub2.monitor.collect.entity.CollectGroup;
 import com.sub2.monitor.collect.entity.CollectSnapshot;
+import com.sub2.monitor.collect.mapper.AccountBalanceRecordMapper;
 import com.sub2.monitor.collect.mapper.CollectGroupMapper;
 import com.sub2.monitor.collect.mapper.CollectSnapshotMapper;
 import com.sub2.monitor.collect.service.PlatformCollectBizService;
@@ -26,6 +28,7 @@ import java.util.List;
 public class PlatformServiceImpl extends ServiceImpl<PlatformMapper, Platform> implements PlatformService {
 
     private final AccountMapper accountMapper;
+    private final AccountBalanceRecordMapper accountBalanceRecordMapper;
     private final CollectSnapshotMapper collectSnapshotMapper;
     private final CollectGroupMapper collectGroupMapper;
     private final PlatformCollectBizService platformCollectBizService;
@@ -129,6 +132,11 @@ public class PlatformServiceImpl extends ServiceImpl<PlatformMapper, Platform> i
                 .filter(time -> time != null)
                 .max(LocalDateTime::compareTo)
                 .orElse(null);
+        List<AccountBalanceRecord> balanceRecords = accountBalanceRecordMapper.selectList(new LambdaQueryWrapper<AccountBalanceRecord>()
+                .eq(AccountBalanceRecord::getPlatformId, platform.getId()));
+        BigDecimal totalBalance = sumLatestBalances(balanceRecords);
+        BigDecimal todayConsumption = sumToday(balanceRecords, AccountBalanceRecord::getConsumptionAmount);
+        BigDecimal todayRecharge = sumToday(balanceRecords, AccountBalanceRecord::getRechargeAmount);
 
         PlatformSummaryResponse.PlatformItem item = new PlatformSummaryResponse.PlatformItem();
         item.setId(platform.getId());
@@ -137,11 +145,11 @@ public class PlatformServiceImpl extends ServiceImpl<PlatformMapper, Platform> i
         item.setEnabled(platform.getEnabled());
         item.setType(platform.getType());
         item.setAccountCount(accountCount.intValue());
-        item.setTotalBalance(BigDecimal.ZERO);
-        item.setPlatformConsumption(BigDecimal.ZERO);
-        item.setActualConsumption(BigDecimal.ZERO);
-        item.setRechargeAmount(BigDecimal.ZERO);
-        item.setArrivalAmount(BigDecimal.ZERO);
+        item.setTotalBalance(totalBalance);
+        item.setPlatformConsumption(todayConsumption);
+        item.setActualConsumption(todayConsumption);
+        item.setRechargeAmount(todayRecharge);
+        item.setArrivalAmount(todayRecharge);
         item.setAbnormalCount(collectFailureCount);
         item.setLastCollectedAt(lastCollectedAt);
         item.setGroupCount(groupCount.intValue());
@@ -149,6 +157,47 @@ public class PlatformServiceImpl extends ServiceImpl<PlatformMapper, Platform> i
         item.setCollectFailureCount(collectFailureCount);
         item.setGroups(groups);
         return item;
+    }
+
+    private BigDecimal sumLatestBalances(List<AccountBalanceRecord> records) {
+        return records.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        this::balanceRecordKey,
+                        record -> record,
+                        (left, right) -> {
+                            if (left.getCollectedAt() == null) {
+                                return right;
+                            }
+                            if (right.getCollectedAt() == null) {
+                                return left;
+                            }
+                            return right.getCollectedAt().isAfter(left.getCollectedAt()) ? right : left;
+                        }
+                ))
+                .values()
+                .stream()
+                .map(AccountBalanceRecord::getBalance)
+                .filter(value -> value != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal sumToday(
+            List<AccountBalanceRecord> records,
+            java.util.function.Function<AccountBalanceRecord, BigDecimal> amountGetter
+    ) {
+        LocalDateTime todayStart = java.time.LocalDate.now().atStartOfDay();
+        return records.stream()
+                .filter(record -> record.getCollectedAt() != null && !record.getCollectedAt().isBefore(todayStart))
+                .map(amountGetter)
+                .filter(value -> value != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private String balanceRecordKey(AccountBalanceRecord record) {
+        if (record.getAccountId() != null) {
+            return "id:" + record.getAccountId();
+        }
+        return "identity:" + record.getAccountIdentity();
     }
 
     private PlatformSummaryResponse.GroupItem toGroupItem(CollectGroup group) {

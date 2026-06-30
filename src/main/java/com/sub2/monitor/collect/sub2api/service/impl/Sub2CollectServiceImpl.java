@@ -5,6 +5,7 @@ import com.sub2.monitor.collect.sub2api.dto.Sub2AvailableGroupsResponse;
 import com.sub2.monitor.collect.sub2api.dto.Sub2KeysResponse;
 import com.sub2.monitor.collect.sub2api.dto.Sub2LoginRequest;
 import com.sub2.monitor.collect.sub2api.dto.Sub2LoginRes;
+import com.sub2.monitor.collect.sub2api.dto.Sub2UsageStatsResponse;
 import com.sub2.monitor.collect.sub2api.service.Sub2CollectService;
 import com.sub2.monitor.monitor.entity.Account;
 import com.sub2.monitor.monitor.mapper.AccountMapper;
@@ -37,6 +38,7 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
     private static final String LOGIN_PATH = "/api/v1/auth/login";
     private static final String AVAILABLE_GROUPS_PATH = "/api/v1/groups/available?timezone=Asia%2FShanghai";
     private static final String KEYS_PATH = "/api/v1/keys?page=1&page_size=100&sort_by=created_at&sort_order=desc&timezone=Asia%2FShanghai";
+    private static final String USAGE_STATS_PATH = "/api/v1/usage/dashboard/stats?timezone=Asia%2FShanghai";
     private static final String AUTHORIZATION_CACHE_PREFIX = "sub2api:authorization:";
     private static final int CONNECT_TIMEOUT_MILLIS = 5000;
     private static final int RESPONSE_TIMEOUT_SECONDS = 10;
@@ -330,6 +332,51 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
         // 当前 service 方法返回单个响应，多个账号成功时沿用分组接口行为返回第一个成功结果。
         log.info("Sub2 密钥列表采集任务结束，baseUrl={}，成功数量={}", baseUrl, responses.size());
         return responses.isEmpty() ? null : responses.get(0);
+    }
+
+    @Override
+    public Sub2UsageStatsResponse collectUsageStats(String baseUrl) {
+        List<Account> accounts = accountMapper.selectSub2apiAccounts(baseUrl);
+        if (accounts.isEmpty()) {
+            log.info("没有需要采集用量统计的 Sub2 账号 (baseUrl={})", baseUrl);
+            return null;
+        }
+
+        WebClient client = buildWebClient(baseUrl);
+        for (Account account : accounts) {
+            String email = account.getEmail();
+            String token = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, email));
+            if (token == null || token.isBlank()) {
+                log.warn("Sub2 用量统计采集跳过账号，Redis 中未找到 token，账号={}，baseUrl={}", email, baseUrl);
+                continue;
+            }
+            WebClient requestClient = client.mutate()
+                    .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .build();
+            try {
+                Sub2UsageStatsResponse response = requestClient.get()
+                        .uri(USAGE_STATS_PATH)
+                        .exchangeToMono(clientResponse -> {
+                            HttpStatusCode status = clientResponse.statusCode();
+                            if (status.is2xxSuccessful()) {
+                                return clientResponse.bodyToMono(Sub2UsageStatsResponse.class);
+                            }
+                            return clientResponse.bodyToMono(String.class)
+                                    .flatMap(errorBody -> Mono.error(new RuntimeException(
+                                            "Request failed with status: " + status + ", body: " + errorBody)));
+                        })
+                        .retryWhen(Retry.fixedDelay(RETRY_TIMES, Duration.ofSeconds(RETRY_DELAY_SECONDS)))
+                        .block();
+                if (response != null) {
+                    return response;
+                }
+            } catch (Exception e) {
+                Throwable rootCause = Exceptions.unwrap(e);
+                log.error("Sub2 用量统计采集失败，账号={}，异常类型={}，原因={}",
+                        email, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
+            }
+        }
+        return null;
     }
 
     /**
