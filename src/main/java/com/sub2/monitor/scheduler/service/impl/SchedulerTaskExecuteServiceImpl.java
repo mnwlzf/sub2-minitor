@@ -1,5 +1,6 @@
 package com.sub2.monitor.scheduler.service.impl;
 
+import com.sub2.monitor.collect.service.PlatformCollectBizService;
 import com.sub2.monitor.scheduler.entity.SchedulerTask;
 import com.sub2.monitor.scheduler.enums.SchedulerTaskType;
 import com.sub2.monitor.scheduler.mapper.SchedulerTaskMapper;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 public class SchedulerTaskExecuteServiceImpl implements SchedulerTaskExecuteService {
 
     private final SchedulerTaskMapper schedulerTaskMapper;
+    private final PlatformCollectBizService platformCollectBizService;
 
     @Override
     public void executeTask(Long id) {
@@ -26,7 +28,8 @@ public class SchedulerTaskExecuteServiceImpl implements SchedulerTaskExecuteServ
     }
 
     private void executeDataCollect(SchedulerTask task) {
-        log.info("数据采集任务逻辑暂未实现，taskId={}", task.getId());
+        log.info("开始执行数据采集任务，taskId={}", task.getId());
+        platformCollectBizService.collectEnabledPlatforms();
     }
 
     private SchedulerTask getTaskOrThrow(Long id) {

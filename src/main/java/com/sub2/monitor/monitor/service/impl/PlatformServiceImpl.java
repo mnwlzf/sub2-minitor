@@ -2,8 +2,7 @@ package com.sub2.monitor.monitor.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.sub2.monitor.collect.newApi.service.NewApiCollectService;
-import com.sub2.monitor.collect.sub2api.service.Sub2CollectService;
+import com.sub2.monitor.collect.service.PlatformCollectBizService;
 import com.sub2.monitor.monitor.dto.PlatformSummaryResponse;
 import com.sub2.monitor.monitor.entity.Account;
 import com.sub2.monitor.monitor.entity.Platform;
@@ -22,8 +21,7 @@ import java.util.List;
 public class PlatformServiceImpl extends ServiceImpl<PlatformMapper, Platform> implements PlatformService {
 
     private final AccountMapper accountMapper;
-    private final Sub2CollectService sub2CollectService;
-    private final NewApiCollectService newApiCollectService;
+    private final PlatformCollectBizService platformCollectBizService;
 
     @Override
     public PlatformSummaryResponse listPlatformSummary(String keyword, Boolean enabled) {
@@ -96,21 +94,7 @@ public class PlatformServiceImpl extends ServiceImpl<PlatformMapper, Platform> i
 
     @Override
     public void collectPlatform(Long id) {
-        Platform platform = getPlatformOrThrow(id);
-        String type = platform.getType() == null ? "" : platform.getType().toUpperCase();
-        if ("NEWAPI".equals(type)) {
-            newApiCollectService.login(platform.getBaseUrl());
-            newApiCollectService.collectGroups(platform.getBaseUrl());
-            newApiCollectService.collectNewApiKeys(platform.getBaseUrl());
-            return;
-        }
-        if ("SUB2API".equals(type)) {
-            sub2CollectService.login(platform.getBaseUrl());
-            sub2CollectService.collectSub2AvailableGroups(platform.getBaseUrl());
-            sub2CollectService.collectSub2Keys(platform.getBaseUrl());
-            return;
-        }
-        throw new IllegalArgumentException("不支持的平台类型: " + platform.getType());
+        platformCollectBizService.collectPlatform(id);
     }
 
     private PlatformSummaryResponse.PlatformItem toPlatformItem(Platform platform) {

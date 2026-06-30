@@ -25,7 +25,7 @@ ALTER TABLE `scheduler_task`
   MODIFY COLUMN `task_name` varchar(100) NOT NULL COMMENT '任务名称，同一任务分组内唯一',
   MODIFY COLUMN `task_group` varchar(64) NOT NULL DEFAULT 'monitor' COMMENT 'Quartz任务分组',
   MODIFY COLUMN `task_type` varchar(64) NOT NULL COMMENT '任务类型，对应SchedulerTaskType枚举',
-  MODIFY COLUMN `base_url` varchar(255) NOT NULL COMMENT '采集平台基础地址',
+  MODIFY COLUMN `base_url` varchar(255) NOT NULL DEFAULT '' COMMENT '采集平台基础地址，数据采集任务可为空',
   MODIFY COLUMN `cron` varchar(64) NOT NULL COMMENT 'Quartz Cron表达式',
   MODIFY COLUMN `enabled` tinyint NOT NULL DEFAULT 1 COMMENT '是否启用：1启用，0停用',
   MODIFY COLUMN `notify_enabled` tinyint NOT NULL DEFAULT 0 COMMENT '是否启用任务通知：1启用，0停用',
@@ -34,6 +34,23 @@ ALTER TABLE `scheduler_task`
   MODIFY COLUMN `remark` varchar(255) DEFAULT NULL COMMENT '备注',
   MODIFY COLUMN `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   MODIFY COLUMN `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间';
+
+CREATE TABLE IF NOT EXISTS `collect_snapshot` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `platform_id` bigint NOT NULL COMMENT '平台ID',
+  `platform_type` varchar(32) NOT NULL COMMENT '平台类型：SUB2API、NEWAPI',
+  `base_url` varchar(255) NOT NULL COMMENT '平台基础地址',
+  `collect_type` varchar(32) NOT NULL COMMENT '采集类型：GROUPS、KEYS、TOKENS',
+  `success` tinyint NOT NULL DEFAULT 0 COMMENT '是否成功：1成功，0失败',
+  `item_count` int NOT NULL DEFAULT 0 COMMENT '本次响应条目数',
+  `message` varchar(500) DEFAULT NULL COMMENT '响应消息',
+  `payload_json` json DEFAULT NULL COMMENT '采集响应JSON',
+  `collected_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '采集时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_collect_snapshot_platform` (`platform_id`),
+  KEY `idx_collect_snapshot_type` (`platform_type`, `collect_type`),
+  KEY `idx_collect_snapshot_collected_at` (`collected_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采集结果快照表';
 
 ALTER TABLE `mail_smtp_config`
   COMMENT = 'SMTP配置表',
