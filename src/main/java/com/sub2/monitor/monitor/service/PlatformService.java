@@ -7,4 +7,14 @@ import com.sub2.monitor.monitor.entity.Platform;
 public interface PlatformService extends IService<Platform> {
 
     PlatformSummaryResponse listPlatformSummary(String keyword, Boolean enabled);
+
+    Platform createPlatform(Platform platform);
+
+    Platform updatePlatform(Long id, Platform platform);
+
+    void deletePlatform(Long id);
+
+    void updateEnabled(Long id, boolean enabled);
+
+    void collectPlatform(Long id);
 }
