@@ -5,9 +5,24 @@
     grid-template-columns: 1fr;
   }
 
+  .layout {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
   .sidebar {
+    position: static;
+    height: auto;
+    overflow-y: visible;
     border-right: 0;
     border-bottom: 1px solid rgba(215, 223, 235, 0.9);
+  }
+
+  .main {
+    height: auto;
+    min-height: 100vh;
+    overflow-y: visible;
   }
 
   .task-panel-head,
