@@ -3,7 +3,6 @@ package com.sub2.monitor.collect.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sub2.monitor.collect.common.dto.LoginResponse;
 import com.sub2.monitor.collect.entity.AccountBalanceRecord;
 import com.sub2.monitor.collect.entity.CollectGroup;
 import com.sub2.monitor.collect.entity.CollectSnapshot;
@@ -17,8 +16,8 @@ import com.sub2.monitor.collect.newApi.service.NewApiCollectService;
 import com.sub2.monitor.collect.service.PlatformCollectBizService;
 import com.sub2.monitor.collect.sub2api.dto.Sub2AvailableGroupsResponse;
 import com.sub2.monitor.collect.sub2api.dto.Sub2KeysResponse;
-import com.sub2.monitor.collect.sub2api.dto.Sub2LoginRes;
 import com.sub2.monitor.collect.sub2api.dto.Sub2UsageStatsResponse;
+import com.sub2.monitor.collect.sub2api.dto.Sub2UserInfoResponse;
 import com.sub2.monitor.collect.sub2api.service.Sub2CollectService;
 import com.sub2.monitor.monitor.entity.Account;
 import com.sub2.monitor.monitor.entity.Platform;
@@ -85,8 +84,12 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
     }
 
     private void collectNewApi(Platform platform) {
-        newApiCollectService.login(platform.getBaseUrl());
         NewApiUserSelfResponse userSelfResponse = newApiCollectService.collectUserSelf(platform.getBaseUrl());
+        if (userSelfResponse == null) {
+            log.info("NewApi 缓存登录态不可用，开始刷新登录态，platformId={}，baseUrl={}", platform.getId(), platform.getBaseUrl());
+            newApiCollectService.login(platform.getBaseUrl());
+            userSelfResponse = newApiCollectService.collectUserSelf(platform.getBaseUrl());
+        }
         saveNewApiBalanceRecord(platform, userSelfResponse);
 
         NewApiGroupsResponse groupsResponse = newApiCollectService.collectGroups(platform.getBaseUrl());
@@ -102,9 +105,15 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
     }
 
     private void collectSub2Api(Platform platform) {
-        LoginResponse<Sub2LoginRes> loginResponse = sub2CollectService.login(platform.getBaseUrl());
+        Sub2UserInfoResponse userInfoResponse = sub2CollectService.collectUserInfo(platform.getBaseUrl());
         Sub2UsageStatsResponse usageStatsResponse = sub2CollectService.collectUsageStats(platform.getBaseUrl());
-        saveSub2BalanceRecord(platform, loginResponse, usageStatsResponse);
+        if (userInfoResponse == null || usageStatsResponse == null) {
+            log.info("Sub2 缓存登录态不可用，开始刷新登录态，platformId={}，baseUrl={}", platform.getId(), platform.getBaseUrl());
+            sub2CollectService.login(platform.getBaseUrl());
+            userInfoResponse = sub2CollectService.collectUserInfo(platform.getBaseUrl());
+            usageStatsResponse = sub2CollectService.collectUsageStats(platform.getBaseUrl());
+        }
+        saveSub2BalanceRecord(platform, userInfoResponse, usageStatsResponse);
 
         Sub2AvailableGroupsResponse groupsResponse = sub2CollectService.collectSub2AvailableGroups(platform.getBaseUrl());
         saveSnapshot(platform, "GROUPS", isSub2Success(groupsResponse), countSub2Groups(groupsResponse),
@@ -148,15 +157,13 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
 
     private void saveSub2BalanceRecord(
             Platform platform,
-            LoginResponse<Sub2LoginRes> loginResponse,
+            Sub2UserInfoResponse userInfoResponse,
             Sub2UsageStatsResponse usageStatsResponse
     ) {
-        if (loginResponse == null || loginResponse.getBody() == null
-                || loginResponse.getBody().getData() == null
-                || loginResponse.getBody().getData().getUser() == null) {
+        if (userInfoResponse == null || userInfoResponse.getData() == null) {
             return;
         }
-        Sub2LoginRes.UserInfo user = loginResponse.getBody().getData().getUser();
+        var user = userInfoResponse.getData();
         BigDecimal totalConsumption = usageStatsResponse == null || usageStatsResponse.getData() == null
                 ? null
                 : usageStatsResponse.getData().getTotalActualCost();

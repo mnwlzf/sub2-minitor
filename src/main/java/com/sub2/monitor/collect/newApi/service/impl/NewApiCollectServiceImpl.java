@@ -73,111 +73,10 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
                 .build();
 
         for (Account account : accounts) {
-            String username = account.getUsername();
-            try {
-                // 多账号连续登录时保留固定间隔，降低平台风控或限流概率。
-                TimeUnit.SECONDS.sleep(ACCOUNT_INTERVAL_SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("等待 NewApi 账号登录间隔时线程被中断，停止后续登录，baseUrl={}，当前账号={}", baseUrl, username);
-                return null;
-            }
-
-            NewApiLoginReq request = new NewApiLoginReq();
-            request.setUsername(username);
-            request.setPassword(account.getPassword());
-
-            try {
-                log.info("开始登录 NewApi 账号，baseUrl={}，账号={}", baseUrl, username);
-                LoginResponse<NewApiLoginRes> response = client.post()
-                        .uri(LOGIN_PATH)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(request)
-                        .exchangeToMono(clientResponse -> {
-                            HttpStatusCode status = clientResponse.statusCode();
-                            log.info("NewApi 登录接口响应，账号={}，状态码={}", username, status);
-                            if (status.is4xxClientError()) {
-                                return clientResponse.bodyToMono(String.class)
-                                        .flatMap(errorBody -> {
-                                            log.error("NewApi 账号登录客户端错误，账号={}，状态码={}，响应体={}",
-                                                    username, status, errorBody);
-                                            return Mono.error(new WebClientResponseException(
-                                                    "Client error: " + errorBody,
-                                                    status.value(),
-                                                    status.toString(),
-                                                    null,
-                                                    errorBody.getBytes(StandardCharsets.UTF_8),
-                                                    StandardCharsets.UTF_8
-                                            ));
-                                        });
-                            } else if (status.is5xxServerError()) {
-                                return clientResponse.bodyToMono(String.class)
-                                        .flatMap(errorBody -> {
-                                            log.warn("NewApi 登录接口服务端错误，账号={}，状态码={}，响应体={}",
-                                                    username, status, errorBody);
-                                            return Mono.error(new WebClientResponseException(
-                                                    "Server error: " + errorBody,
-                                                    status.value(),
-                                                    status.toString(),
-                                                    null,
-                                                    errorBody.getBytes(StandardCharsets.UTF_8),
-                                                    StandardCharsets.UTF_8
-                                            ));
-                                        });
-                            } else {
-                                // NewApi 登录态通常通过响应头 Cookie 维持，因此保留 headers 供后续接口复用。
-                                return clientResponse.bodyToMono(NewApiLoginRes.class)
-                                        .map(body -> {
-                                            LoginResponse<NewApiLoginRes> wrapper = new LoginResponse<>();
-                                            wrapper.setHeaders(clientResponse.headers().asHttpHeaders());
-                                            wrapper.setBody(body);
-                                            return wrapper;
-                                        });
-                            }
-                        })
-                        .retryWhen(Retry.fixedDelay(RETRY_TIMES, Duration.ofSeconds(RETRY_DELAY_SECONDS))
-                                .doBeforeRetry(retrySignal ->
-                                        log.warn("NewApi 账号登录重试，账号={}，第{}次，原因={}",
-                                                username,
-                                                retrySignal.totalRetries() + 1,
-                                                retrySignal.failure().getMessage())
-                                )
-                        )
-                        .block();
-
-                if (response == null || response.getBody() == null) {
-                    log.warn("NewApi 账号登录返回空响应，账号={}", username);
-                    continue;
-                }
-                if (!Boolean.TRUE.equals(response.getBody().getSuccess())) {
-                    log.warn("NewApi 账号登录业务失败，账号={}，响应={}", username, response.getBody());
-                    continue;
-                }
-
-                // NewApi 后续接口需要同时携带 Cookie 和 new-api-user，请求头值分别来自登录响应头和响应体用户 id。
-                String cookie = response.getHeaders() == null ? null : response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
-                Long userId = response.getBody().getData() == null ? null : response.getBody().getData().getId();
-                if (cookie != null && !cookie.isBlank()) {
-                    redisTemplate.opsForValue().set(buildAuthorizationCacheKey(baseUrl, username, COOKIE_CACHE_NAME), cookie, SESSION_CACHE_TIMEOUT_MINUTES, TimeUnit.MINUTES);
-                    log.info("NewApi 账号登录成功并已缓存 Cookie，账号={}，Cookie长度={}", username, cookie.length());
-                } else {
-                    log.info("NewApi 账号登录成功但响应头未返回 Set-Cookie，账号={}", username);
-                }
-                if (userId != null) {
-                    redisTemplate.opsForValue().set(buildAuthorizationCacheKey(baseUrl, username, NEW_API_USER_CACHE_NAME), userId.toString(), SESSION_CACHE_TIMEOUT_MINUTES, TimeUnit.MINUTES);
-                    log.info("NewApi 账号登录成功并已缓存 {}，账号={}，用户ID={}", NEW_API_USER_HEADER, username, userId);
-                } else {
-                    log.warn("NewApi 账号登录成功但响应体未返回用户ID，账号={}，响应={}", username, response.getBody());
-                }
+            waitAccountInterval(baseUrl, account.getUsername());
+            LoginResponse<NewApiLoginRes> response = loginAccount(baseUrl, account, client);
+            if (response != null) {
                 return response;
-            } catch (WebClientResponseException e) {
-                String errorBody = e.getResponseBodyAsString();
-                log.error("NewApi 账号登录最终失败，账号={}，HTTP状态码={}，响应体={}",
-                        username, e.getStatusCode(), errorBody);
-            } catch (Exception e) {
-                Throwable rootCause = Exceptions.unwrap(e);
-                log.error("NewApi 账号登录异常，账号={}，异常类型={}，原因={}",
-                        username, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
             }
         }
         log.warn("NewApi 登录任务结束，所有账号均未成功登录，baseUrl={}", baseUrl);
@@ -198,16 +97,14 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
 
         for (Account account : accounts) {
             String username = account.getUsername();
-            String cookie = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, COOKIE_CACHE_NAME));
-            String newApiUser = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, NEW_API_USER_CACHE_NAME));
-            if (cookie == null || cookie.isBlank() || newApiUser == null || newApiUser.isBlank()) {
-                log.warn("NewApi 分组采集跳过账号，Redis 中缺少 Cookie 或 {}，账号={}，baseUrl={}", NEW_API_USER_HEADER, username, baseUrl);
+            SessionHeaders sessionHeaders = getSessionHeadersOrLogin(baseUrl, account, client);
+            if (sessionHeaders == null) {
                 continue;
             }
 
             WebClient requestClient = client.mutate()
-                    .defaultHeader(HttpHeaders.COOKIE, cookie)
-                    .defaultHeader(NEW_API_USER_HEADER, newApiUser)
+                    .defaultHeader(HttpHeaders.COOKIE, sessionHeaders.cookie())
+                    .defaultHeader(NEW_API_USER_HEADER, sessionHeaders.newApiUser())
                     .build();
 
             log.info("开始请求 NewApi 分组，账号={}，url={}{}", username, baseUrl, GROUPS_PATH);
@@ -232,8 +129,14 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
                                     .flatMap(errorBody -> {
                                         log.error("NewApi 分组请求失败，账号={}，状态码={}，响应体={}",
                                                 username, status, errorBody);
-                                        return Mono.error(new RuntimeException(
-                                                "Request failed with status: " + status + ", body: " + errorBody));
+                                        return Mono.error(new WebClientResponseException(
+                                                "NewApi groups failed: " + errorBody,
+                                                status.value(),
+                                                status.toString(),
+                                                null,
+                                                errorBody.getBytes(StandardCharsets.UTF_8),
+                                                StandardCharsets.UTF_8
+                                        ));
                                     });
                         })
                         .retryWhen(Retry.fixedDelay(RETRY_TIMES, Duration.ofSeconds(RETRY_DELAY_SECONDS))
@@ -254,6 +157,16 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
                 }
             } catch (Exception e) {
                 Throwable rootCause = Exceptions.unwrap(e);
+                if (isAuthFailure(rootCause)) {
+                    log.warn("NewApi 分组认证失效，刷新登录态后重试一次，账号={}，baseUrl={}", username, baseUrl);
+                    clearSessionHeaders(baseUrl, username);
+                    SessionHeaders refreshedHeaders = getSessionHeadersOrLogin(baseUrl, account, client);
+                    NewApiGroupsResponse retryResponse = refreshedHeaders == null ? null : requestGroups(username, client, refreshedHeaders);
+                    if (retryResponse != null) {
+                        responses.add(retryResponse);
+                        continue;
+                    }
+                }
                 log.error("NewApi 分组采集最终失败，账号={}，异常类型={}，原因={}",
                         username, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
             }
@@ -277,16 +190,14 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
 
         for (Account account : accounts) {
             String username = account.getUsername();
-            String cookie = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, COOKIE_CACHE_NAME));
-            String newApiUser = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, NEW_API_USER_CACHE_NAME));
-            if (cookie == null || cookie.isBlank() || newApiUser == null || newApiUser.isBlank()) {
-                log.warn("NewApi 令牌采集跳过账号，Redis 中缺少 Cookie 或 {}，账号={}，baseUrl={}", NEW_API_USER_HEADER, username, baseUrl);
+            SessionHeaders sessionHeaders = getSessionHeadersOrLogin(baseUrl, account, client);
+            if (sessionHeaders == null) {
                 continue;
             }
 
             WebClient requestClient = client.mutate()
-                    .defaultHeader(HttpHeaders.COOKIE, cookie)
-                    .defaultHeader(NEW_API_USER_HEADER, newApiUser)
+                    .defaultHeader(HttpHeaders.COOKIE, sessionHeaders.cookie())
+                    .defaultHeader(NEW_API_USER_HEADER, sessionHeaders.newApiUser())
                     .build();
 
             log.info("开始请求 NewApi 令牌列表，账号={}，url={}{}", username, baseUrl, TOKENS_PATH);
@@ -313,8 +224,14 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
                                     .flatMap(errorBody -> {
                                         log.error("NewApi 令牌列表请求失败，账号={}，状态码={}，响应体={}",
                                                 username, status, errorBody);
-                                        return Mono.error(new RuntimeException(
-                                                "Request failed with status: " + status + ", body: " + errorBody));
+                                        return Mono.error(new WebClientResponseException(
+                                                "NewApi tokens failed: " + errorBody,
+                                                status.value(),
+                                                status.toString(),
+                                                null,
+                                                errorBody.getBytes(StandardCharsets.UTF_8),
+                                                StandardCharsets.UTF_8
+                                        ));
                                     });
                         })
                         .retryWhen(Retry.fixedDelay(RETRY_TIMES, Duration.ofSeconds(RETRY_DELAY_SECONDS))
@@ -335,6 +252,16 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
                 }
             } catch (Exception e) {
                 Throwable rootCause = Exceptions.unwrap(e);
+                if (isAuthFailure(rootCause)) {
+                    log.warn("NewApi 令牌列表认证失效，刷新登录态后重试一次，账号={}，baseUrl={}", username, baseUrl);
+                    clearSessionHeaders(baseUrl, username);
+                    SessionHeaders refreshedHeaders = getSessionHeadersOrLogin(baseUrl, account, client);
+                    NewApiTokensResponse retryResponse = refreshedHeaders == null ? null : requestTokens(username, client, refreshedHeaders);
+                    if (retryResponse != null) {
+                        responses.add(retryResponse);
+                        continue;
+                    }
+                }
                 log.error("NewApi 令牌列表采集最终失败，账号={}，异常类型={}，原因={}",
                         username, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
             }
@@ -355,16 +282,14 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
         WebClient client = buildWebClient(baseUrl);
         for (Account account : accounts) {
             String username = account.getUsername();
-            String cookie = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, COOKIE_CACHE_NAME));
-            String newApiUser = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, NEW_API_USER_CACHE_NAME));
-            if (cookie == null || cookie.isBlank() || newApiUser == null || newApiUser.isBlank()) {
-                log.warn("NewApi 用户余额采集跳过账号，Redis 中缺少 Cookie 或 {}，账号={}，baseUrl={}", NEW_API_USER_HEADER, username, baseUrl);
+            SessionHeaders sessionHeaders = getSessionHeadersOrLogin(baseUrl, account, client);
+            if (sessionHeaders == null) {
                 continue;
             }
 
             WebClient requestClient = client.mutate()
-                    .defaultHeader(HttpHeaders.COOKIE, cookie)
-                    .defaultHeader(NEW_API_USER_HEADER, newApiUser)
+                    .defaultHeader(HttpHeaders.COOKIE, sessionHeaders.cookie())
+                    .defaultHeader(NEW_API_USER_HEADER, sessionHeaders.newApiUser())
                     .build();
             try {
                 NewApiUserSelfResponse response = requestClient.get()
@@ -375,8 +300,14 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
                                 return clientResponse.bodyToMono(NewApiUserSelfResponse.class);
                             }
                             return clientResponse.bodyToMono(String.class)
-                                    .flatMap(errorBody -> Mono.error(new RuntimeException(
-                                            "Request failed with status: " + status + ", body: " + errorBody)));
+                                    .flatMap(errorBody -> Mono.error(new WebClientResponseException(
+                                            "NewApi user self failed: " + errorBody,
+                                            status.value(),
+                                            status.toString(),
+                                            null,
+                                            errorBody.getBytes(StandardCharsets.UTF_8),
+                                            StandardCharsets.UTF_8
+                                    )));
                         })
                         .retryWhen(Retry.fixedDelay(RETRY_TIMES, Duration.ofSeconds(RETRY_DELAY_SECONDS)))
                         .block();
@@ -385,6 +316,15 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
                 }
             } catch (Exception e) {
                 Throwable rootCause = Exceptions.unwrap(e);
+                if (isAuthFailure(rootCause)) {
+                    log.warn("NewApi 用户余额认证失效，刷新登录态后重试一次，账号={}，baseUrl={}", username, baseUrl);
+                    clearSessionHeaders(baseUrl, username);
+                    SessionHeaders refreshedHeaders = getSessionHeadersOrLogin(baseUrl, account, client);
+                    NewApiUserSelfResponse retryResponse = refreshedHeaders == null ? null : requestUserSelf(client, refreshedHeaders);
+                    if (retryResponse != null) {
+                        return retryResponse;
+                    }
+                }
                 log.error("NewApi 用户余额采集失败，账号={}，异常类型={}，原因={}",
                         username, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
             }
@@ -441,5 +381,198 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
      */
     private String buildAuthorizationCacheKey(String baseUrl, String username, String headerName) {
         return AUTHORIZATION_CACHE_PREFIX + headerName + ":" + baseUrl + ":" + username;
+    }
+
+    private void waitAccountInterval(String baseUrl, String username) {
+        try {
+            TimeUnit.SECONDS.sleep(ACCOUNT_INTERVAL_SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("等待 NewApi 账号登录间隔时线程被中断，baseUrl=" + baseUrl + "，账号=" + username, e);
+        }
+    }
+
+    private LoginResponse<NewApiLoginRes> loginAccount(String baseUrl, Account account, WebClient client) {
+        String username = account.getUsername();
+        NewApiLoginReq request = new NewApiLoginReq();
+        request.setUsername(username);
+        request.setPassword(account.getPassword());
+
+        try {
+            log.info("开始登录 NewApi 账号，baseUrl={}，账号={}", baseUrl, username);
+            LoginResponse<NewApiLoginRes> response = client.post()
+                    .uri(LOGIN_PATH)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .exchangeToMono(clientResponse -> {
+                        HttpStatusCode status = clientResponse.statusCode();
+                        log.info("NewApi 登录接口响应，账号={}，状态码={}", username, status);
+                        if (status.is2xxSuccessful()) {
+                            return clientResponse.bodyToMono(NewApiLoginRes.class)
+                                    .map(body -> {
+                                        LoginResponse<NewApiLoginRes> wrapper = new LoginResponse<>();
+                                        wrapper.setHeaders(clientResponse.headers().asHttpHeaders());
+                                        wrapper.setBody(body);
+                                        return wrapper;
+                                    });
+                        }
+                        return clientResponse.bodyToMono(String.class)
+                                .flatMap(errorBody -> Mono.error(new WebClientResponseException(
+                                        "NewApi login failed: " + errorBody,
+                                        status.value(),
+                                        status.toString(),
+                                        null,
+                                        errorBody.getBytes(StandardCharsets.UTF_8),
+                                        StandardCharsets.UTF_8
+                                )));
+                    })
+                    .retryWhen(Retry.fixedDelay(RETRY_TIMES, Duration.ofSeconds(RETRY_DELAY_SECONDS))
+                            .doBeforeRetry(retrySignal ->
+                                    log.warn("NewApi 账号登录重试，账号={}，第{}次，原因={}",
+                                            username,
+                                            retrySignal.totalRetries() + 1,
+                                            retrySignal.failure().getMessage())
+                            )
+                    )
+                    .block();
+
+            if (response == null || response.getBody() == null) {
+                log.warn("NewApi 账号登录返回空响应，账号={}", username);
+                return null;
+            }
+            if (!Boolean.TRUE.equals(response.getBody().getSuccess())) {
+                log.warn("NewApi 账号登录业务失败，账号={}，响应={}", username, response.getBody());
+                return null;
+            }
+
+            String cookie = response.getHeaders() == null ? null : response.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
+            Long userId = response.getBody().getData() == null ? null : response.getBody().getData().getId();
+            if (cookie != null && !cookie.isBlank()) {
+                redisTemplate.opsForValue().set(buildAuthorizationCacheKey(baseUrl, username, COOKIE_CACHE_NAME), cookie, SESSION_CACHE_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+                log.info("NewApi 账号登录成功并已缓存 Cookie，账号={}，Cookie长度={}", username, cookie.length());
+            } else {
+                log.info("NewApi 账号登录成功但响应头未返回 Set-Cookie，账号={}", username);
+            }
+            if (userId != null) {
+                redisTemplate.opsForValue().set(buildAuthorizationCacheKey(baseUrl, username, NEW_API_USER_CACHE_NAME), userId.toString(), SESSION_CACHE_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+                log.info("NewApi 账号登录成功并已缓存 {}，账号={}，用户ID={}", NEW_API_USER_HEADER, username, userId);
+            } else {
+                log.warn("NewApi 账号登录成功但响应体未返回用户ID，账号={}，响应={}", username, response.getBody());
+            }
+            return response;
+        } catch (WebClientResponseException e) {
+            log.error("NewApi 账号登录最终失败，账号={}，HTTP状态码={}，响应体={}",
+                    username, e.getStatusCode(), e.getResponseBodyAsString());
+        } catch (Exception e) {
+            Throwable rootCause = Exceptions.unwrap(e);
+            log.error("NewApi 账号登录异常，账号={}，异常类型={}，原因={}",
+                    username, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
+        }
+        return null;
+    }
+
+    private SessionHeaders getSessionHeadersOrLogin(String baseUrl, Account account, WebClient client) {
+        String username = account.getUsername();
+        String cookie = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, COOKIE_CACHE_NAME));
+        String newApiUser = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, NEW_API_USER_CACHE_NAME));
+        if (cookie != null && !cookie.isBlank() && newApiUser != null && !newApiUser.isBlank()) {
+            return new SessionHeaders(cookie, newApiUser);
+        }
+        log.info("NewApi Redis 中缺少 Cookie 或 {}，准备登录刷新，账号={}，baseUrl={}", NEW_API_USER_HEADER, username, baseUrl);
+        loginAccount(baseUrl, account, client.mutate().defaultHeader(HttpHeaders.ORIGIN, baseUrl).build());
+        cookie = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, COOKIE_CACHE_NAME));
+        newApiUser = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, NEW_API_USER_CACHE_NAME));
+        if (cookie == null || cookie.isBlank() || newApiUser == null || newApiUser.isBlank()) {
+            return null;
+        }
+        return new SessionHeaders(cookie, newApiUser);
+    }
+
+    private void clearSessionHeaders(String baseUrl, String username) {
+        redisTemplate.delete(buildAuthorizationCacheKey(baseUrl, username, COOKIE_CACHE_NAME));
+        redisTemplate.delete(buildAuthorizationCacheKey(baseUrl, username, NEW_API_USER_CACHE_NAME));
+    }
+
+    private NewApiGroupsResponse requestGroups(String username, WebClient client, SessionHeaders sessionHeaders) {
+        return client.mutate()
+                .defaultHeader(HttpHeaders.COOKIE, sessionHeaders.cookie())
+                .defaultHeader(NEW_API_USER_HEADER, sessionHeaders.newApiUser())
+                .build()
+                .get()
+                .uri(GROUPS_PATH)
+                .exchangeToMono(clientResponse -> {
+                    HttpStatusCode status = clientResponse.statusCode();
+                    if (status.is2xxSuccessful()) {
+                        return clientResponse.bodyToMono(NewApiRawGroupsResponse.class).map(this::convertGroupsResponse);
+                    }
+                    return clientResponse.bodyToMono(String.class)
+                            .flatMap(errorBody -> Mono.error(new WebClientResponseException(
+                                    "NewApi groups failed: " + errorBody,
+                                    status.value(),
+                                    status.toString(),
+                                    null,
+                                    errorBody.getBytes(StandardCharsets.UTF_8),
+                                    StandardCharsets.UTF_8
+                            )));
+                })
+                .block();
+    }
+
+    private NewApiTokensResponse requestTokens(String username, WebClient client, SessionHeaders sessionHeaders) {
+        return client.mutate()
+                .defaultHeader(HttpHeaders.COOKIE, sessionHeaders.cookie())
+                .defaultHeader(NEW_API_USER_HEADER, sessionHeaders.newApiUser())
+                .build()
+                .get()
+                .uri(TOKENS_PATH)
+                .exchangeToMono(clientResponse -> {
+                    HttpStatusCode status = clientResponse.statusCode();
+                    if (status.is2xxSuccessful()) {
+                        return clientResponse.bodyToMono(NewApiTokensResponse.class);
+                    }
+                    return clientResponse.bodyToMono(String.class)
+                            .flatMap(errorBody -> Mono.error(new WebClientResponseException(
+                                    "NewApi tokens failed: " + errorBody,
+                                    status.value(),
+                                    status.toString(),
+                                    null,
+                                    errorBody.getBytes(StandardCharsets.UTF_8),
+                                    StandardCharsets.UTF_8
+                            )));
+                })
+                .block();
+    }
+
+    private NewApiUserSelfResponse requestUserSelf(WebClient client, SessionHeaders sessionHeaders) {
+        return client.mutate()
+                .defaultHeader(HttpHeaders.COOKIE, sessionHeaders.cookie())
+                .defaultHeader(NEW_API_USER_HEADER, sessionHeaders.newApiUser())
+                .build()
+                .get()
+                .uri(USER_SELF_PATH)
+                .exchangeToMono(clientResponse -> {
+                    HttpStatusCode status = clientResponse.statusCode();
+                    if (status.is2xxSuccessful()) {
+                        return clientResponse.bodyToMono(NewApiUserSelfResponse.class);
+                    }
+                    return clientResponse.bodyToMono(String.class)
+                            .flatMap(errorBody -> Mono.error(new WebClientResponseException(
+                                    "NewApi user self failed: " + errorBody,
+                                    status.value(),
+                                    status.toString(),
+                                    null,
+                                    errorBody.getBytes(StandardCharsets.UTF_8),
+                                    StandardCharsets.UTF_8
+                            )));
+                })
+                .block();
+    }
+
+    private boolean isAuthFailure(Throwable throwable) {
+        return throwable instanceof WebClientResponseException responseException
+                && (responseException.getStatusCode().value() == 401 || responseException.getStatusCode().value() == 403);
+    }
+
+    private record SessionHeaders(String cookie, String newApiUser) {
     }
 }

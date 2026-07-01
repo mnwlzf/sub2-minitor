@@ -6,6 +6,7 @@ import com.sub2.monitor.collect.sub2api.dto.Sub2KeysResponse;
 import com.sub2.monitor.collect.sub2api.dto.Sub2LoginRequest;
 import com.sub2.monitor.collect.sub2api.dto.Sub2LoginRes;
 import com.sub2.monitor.collect.sub2api.dto.Sub2UsageStatsResponse;
+import com.sub2.monitor.collect.sub2api.dto.Sub2UserInfoResponse;
 import com.sub2.monitor.collect.sub2api.service.Sub2CollectService;
 import com.sub2.monitor.monitor.entity.Account;
 import com.sub2.monitor.monitor.mapper.AccountMapper;
@@ -36,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 public class Sub2CollectServiceImpl implements Sub2CollectService {
 
     private static final String LOGIN_PATH = "/api/v1/auth/login";
+    private static final String USER_INFO_PATH = "/api/v1/auth/me?timezone=Asia%2FShanghai";
     private static final String AVAILABLE_GROUPS_PATH = "/api/v1/groups/available?timezone=Asia%2FShanghai";
     private static final String KEYS_PATH = "/api/v1/keys?page=1&page_size=100&sort_by=created_at&sort_order=desc&timezone=Asia%2FShanghai";
     private static final String USAGE_STATS_PATH = "/api/v1/usage/dashboard/stats?timezone=Asia%2FShanghai";
@@ -45,6 +47,7 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
     private static final int RETRY_TIMES = 3;
     private static final int RETRY_DELAY_SECONDS = 5;
     private static final int ACCOUNT_INTERVAL_SECONDS = 5;
+    private static final long TOKEN_CACHE_TIMEOUT_MINUTES = 120;
 
     @Autowired
     private AccountMapper accountMapper;
@@ -67,95 +70,10 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
                 .build();
 
         for (Account account : accounts) {
-            String email = account.getEmail();
-            try {
-                // 多账号连续登录时保留固定间隔，降低平台风控或限流概率。
-                TimeUnit.SECONDS.sleep(ACCOUNT_INTERVAL_SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("等待账号登录间隔时线程被中断，停止后续登录，baseUrl={}，当前账号={}", baseUrl, email);
-                return null;
-            }
-
-            Sub2LoginRequest request = new Sub2LoginRequest();
-            request.setEmail(email);
-            request.setPassword(account.getPassword());
-
-            try {
-                log.info("开始登录 Sub2 账号，baseUrl={}，账号={}", baseUrl, email);
-                LoginResponse<Sub2LoginRes> response = client.post()
-                        .uri(LOGIN_PATH)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(request)
-                        .exchangeToMono(clientResponse -> {
-                            HttpStatusCode status = clientResponse.statusCode();
-                            log.info("Sub2 登录接口响应，账号={}，状态码={}", email, status);
-                            if (status.is4xxClientError()) {
-                                return clientResponse.bodyToMono(String.class)
-                                        .flatMap(errorBody -> {
-                                            log.error("Sub2 账号登录客户端错误，账号={}，状态码={}，响应体={}",
-                                                    email, status, errorBody);
-                                            return Mono.error(new WebClientResponseException(
-                                                    "Client error: " + errorBody,
-                                                    status.value(),
-                                                    status.toString(),
-                                                    null,
-                                                    errorBody.getBytes(StandardCharsets.UTF_8),
-                                                    StandardCharsets.UTF_8
-                                            ));
-                                        });
-                            } else if (status.is5xxServerError()) {
-                                return clientResponse.bodyToMono(String.class)
-                                        .flatMap(errorBody -> {
-                                            log.warn("Sub2 登录接口服务端错误，账号={}，状态码={}，响应体={}",
-                                                    email, status, errorBody);
-                                            return Mono.error(new WebClientResponseException(
-                                                    "Server error: " + errorBody,
-                                                    status.value(),
-                                                    status.toString(),
-                                                    null,
-                                                    errorBody.getBytes(StandardCharsets.UTF_8),
-                                                    StandardCharsets.UTF_8
-                                            ));
-                                        });
-                            } else {
-                                // 成功响应需要同时保留响应头和业务体，后续如需 Cookie 或限流头时可以直接复用。
-                                return clientResponse.bodyToMono(Sub2LoginRes.class)
-                                        .map(body -> {
-                                            LoginResponse<Sub2LoginRes> wrapper = new LoginResponse<>();
-                                            wrapper.setHeaders(clientResponse.headers().asHttpHeaders());
-                                            wrapper.setBody(body);
-                                            return wrapper;
-                                        });
-                            }
-                        })
-                        .retryWhen(Retry.fixedDelay(RETRY_TIMES, Duration.ofSeconds(RETRY_DELAY_SECONDS))
-                                .doBeforeRetry(retrySignal ->
-                                        log.warn("Sub2 账号登录重试，账号={}，第{}次，原因={}",
-                                                email,
-                                                retrySignal.totalRetries() + 1,
-                                                retrySignal.failure().getMessage())
-                                )
-                        )
-                        .block();
-                String accessToken = getAccessToken(response);
-                if (accessToken == null || accessToken.isBlank()) {
-                    log.warn("Sub2 账号登录成功但未返回 access_token，账号={}，响应={}", email, response);
-                    continue;
-                }
-
-                // 仅缓存 token，不打印 token 明文，避免日志泄露认证凭据。
-                redisTemplate.opsForValue().set(buildAuthorizationCacheKey(baseUrl, email), accessToken, 120, TimeUnit.MINUTES);
-                log.info("Sub2 账号登录成功并已缓存 token，账号={}，token长度={}", email, accessToken.length());
+            waitAccountInterval(baseUrl, account.getEmail());
+            LoginResponse<Sub2LoginRes> response = loginAccount(baseUrl, account, client);
+            if (response != null) {
                 return response;
-            } catch (WebClientResponseException e) {
-                String errorBody = e.getResponseBodyAsString();
-                log.error("Sub2 账号登录最终失败，账号={}，HTTP状态码={}，响应体={}",
-                        email, e.getStatusCode(), errorBody);
-            } catch (Exception e) {
-                Throwable rootCause = Exceptions.unwrap(e);
-                log.error("Sub2 账号登录异常，账号={}，异常类型={}，原因={}",
-                        email, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
             }
         }
         log.warn("Sub2 登录任务结束，所有账号均未成功登录，baseUrl={}", baseUrl);
@@ -179,10 +97,8 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
         for (Account account : accounts) {
             String email = account.getEmail();
 
-            // 采集接口依赖登录阶段写入 Redis 的 token；缺失时跳过当前账号，避免无效请求。
-            String token = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, email));
+            String token = getTokenOrLogin(baseUrl, account, client);
             if (token == null || token.isBlank()) {
-                log.warn("Sub2 可用分组采集跳过账号，Redis 中未找到 token，账号={}，baseUrl={}", email, baseUrl);
                 continue;
             }
 
@@ -213,8 +129,14 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
                                         .flatMap(errorBody -> {
                                             log.error("Sub2 可用分组请求失败，账号={}，状态码={}，响应体={}",
                                                     email, status, errorBody);
-                                            return Mono.error(new RuntimeException(
-                                                    "Request failed with status: " + status + ", body: " + errorBody));
+                                            return Mono.error(new WebClientResponseException(
+                                                    "Sub2 available groups failed: " + errorBody,
+                                                    status.value(),
+                                                    status.toString(),
+                                                    null,
+                                                    errorBody.getBytes(StandardCharsets.UTF_8),
+                                                    StandardCharsets.UTF_8
+                                            ));
                                         });
                             }
                         })
@@ -238,6 +160,16 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
             } catch (Exception e) {
                 // 单个账号失败不影响其他账号，最终通过日志定位具体失败账号和原因。
                 Throwable rootCause = Exceptions.unwrap(e);
+                if (isAuthFailure(rootCause)) {
+                    log.warn("Sub2 可用分组认证失效，刷新登录态后重试一次，账号={}，baseUrl={}", email, baseUrl);
+                    redisTemplate.delete(buildAuthorizationCacheKey(baseUrl, email));
+                    String refreshedToken = getTokenOrLogin(baseUrl, account, client);
+                    Sub2AvailableGroupsResponse retryResponse = refreshedToken == null ? null : requestAvailableGroups(baseUrl, email, client, refreshedToken);
+                    if (retryResponse != null) {
+                        responses.add(retryResponse);
+                        continue;
+                    }
+                }
                 log.error("Sub2 可用分组采集最终失败，账号={}，异常类型={}，原因={}",
                         email, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
             }
@@ -265,9 +197,8 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
         for (Account account : accounts) {
             String email = account.getEmail();
 
-            String token = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, email));
+            String token = getTokenOrLogin(baseUrl, account, client);
             if (token == null || token.isBlank()) {
-                log.warn("Sub2 密钥采集跳过账号，Redis 中未找到 token，账号={}，baseUrl={}", email, baseUrl);
                 continue;
             }
 
@@ -300,8 +231,14 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
                                         .flatMap(errorBody -> {
                                             log.error("Sub2 密钥列表请求失败，账号={}，状态码={}，响应体={}",
                                                     email, status, errorBody);
-                                            return Mono.error(new RuntimeException(
-                                                    "Request failed with status: " + status + ", body: " + errorBody));
+                                            return Mono.error(new WebClientResponseException(
+                                                    "Sub2 keys failed: " + errorBody,
+                                                    status.value(),
+                                                    status.toString(),
+                                                    null,
+                                                    errorBody.getBytes(StandardCharsets.UTF_8),
+                                                    StandardCharsets.UTF_8
+                                            ));
                                         });
                             }
                         })
@@ -324,6 +261,16 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
             } catch (Exception e) {
                 // 与分组采集保持一致，单账号失败后继续处理其他账号。
                 Throwable rootCause = Exceptions.unwrap(e);
+                if (isAuthFailure(rootCause)) {
+                    log.warn("Sub2 密钥采集认证失效，刷新登录态后重试一次，账号={}，baseUrl={}", email, baseUrl);
+                    redisTemplate.delete(buildAuthorizationCacheKey(baseUrl, email));
+                    String refreshedToken = getTokenOrLogin(baseUrl, account, client);
+                    Sub2KeysResponse retryResponse = refreshedToken == null ? null : requestSub2Keys(baseUrl, email, client, refreshedToken);
+                    if (retryResponse != null) {
+                        responses.add(retryResponse);
+                        continue;
+                    }
+                }
                 log.error("Sub2 密钥列表采集最终失败，账号={}，异常类型={}，原因={}",
                         email, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
             }
@@ -345,9 +292,8 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
         WebClient client = buildWebClient(baseUrl);
         for (Account account : accounts) {
             String email = account.getEmail();
-            String token = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, email));
+            String token = getTokenOrLogin(baseUrl, account, client);
             if (token == null || token.isBlank()) {
-                log.warn("Sub2 用量统计采集跳过账号，Redis 中未找到 token，账号={}，baseUrl={}", email, baseUrl);
                 continue;
             }
             WebClient requestClient = client.mutate()
@@ -362,8 +308,14 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
                                 return clientResponse.bodyToMono(Sub2UsageStatsResponse.class);
                             }
                             return clientResponse.bodyToMono(String.class)
-                                    .flatMap(errorBody -> Mono.error(new RuntimeException(
-                                            "Request failed with status: " + status + ", body: " + errorBody)));
+                                    .flatMap(errorBody -> Mono.error(new WebClientResponseException(
+                                            "Sub2 usage stats failed: " + errorBody,
+                                            status.value(),
+                                            status.toString(),
+                                            null,
+                                            errorBody.getBytes(StandardCharsets.UTF_8),
+                                            StandardCharsets.UTF_8
+                                    )));
                         })
                         .retryWhen(Retry.fixedDelay(RETRY_TIMES, Duration.ofSeconds(RETRY_DELAY_SECONDS)))
                         .block();
@@ -372,7 +324,54 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
                 }
             } catch (Exception e) {
                 Throwable rootCause = Exceptions.unwrap(e);
+                if (isAuthFailure(rootCause)) {
+                    log.warn("Sub2 用量统计认证失效，刷新登录态后重试一次，账号={}，baseUrl={}", email, baseUrl);
+                    redisTemplate.delete(buildAuthorizationCacheKey(baseUrl, email));
+                    String refreshedToken = getTokenOrLogin(baseUrl, account, client);
+                    Sub2UsageStatsResponse retryResponse = refreshedToken == null ? null : requestUsageStats(client, refreshedToken);
+                    if (retryResponse != null) {
+                        return retryResponse;
+                    }
+                }
                 log.error("Sub2 用量统计采集失败，账号={}，异常类型={}，原因={}",
+                        email, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public Sub2UserInfoResponse collectUserInfo(String baseUrl) {
+        List<Account> accounts = accountMapper.selectSub2apiAccounts(baseUrl);
+        if (accounts.isEmpty()) {
+            log.info("没有需要采集用户信息的 Sub2 账号 (baseUrl={})", baseUrl);
+            return null;
+        }
+
+        WebClient client = buildWebClient(baseUrl);
+        for (Account account : accounts) {
+            String email = account.getEmail();
+            String token = getTokenOrLogin(baseUrl, account, client);
+            if (token == null || token.isBlank()) {
+                continue;
+            }
+            try {
+                Sub2UserInfoResponse response = requestUserInfo(client, token);
+                if (response != null) {
+                    return response;
+                }
+            } catch (Exception e) {
+                Throwable rootCause = Exceptions.unwrap(e);
+                if (isAuthFailure(rootCause)) {
+                    log.warn("Sub2 用户信息认证失效，刷新登录态后重试一次，账号={}，baseUrl={}", email, baseUrl);
+                    redisTemplate.delete(buildAuthorizationCacheKey(baseUrl, email));
+                    String refreshedToken = getTokenOrLogin(baseUrl, account, client);
+                    Sub2UserInfoResponse retryResponse = refreshedToken == null ? null : requestUserInfo(client, refreshedToken);
+                    if (retryResponse != null) {
+                        return retryResponse;
+                    }
+                }
+                log.error("Sub2 用户信息采集失败，账号={}，异常类型={}，原因={}",
                         email, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
             }
         }
@@ -394,6 +393,190 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
                                 .responseTimeout(Duration.ofSeconds(RESPONSE_TIMEOUT_SECONDS))
                 ))
                 .build();
+    }
+
+    private void waitAccountInterval(String baseUrl, String email) {
+        try {
+            TimeUnit.SECONDS.sleep(ACCOUNT_INTERVAL_SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("等待账号登录间隔时线程被中断，baseUrl=" + baseUrl + "，账号=" + email, e);
+        }
+    }
+
+    private LoginResponse<Sub2LoginRes> loginAccount(String baseUrl, Account account, WebClient client) {
+        String email = account.getEmail();
+        Sub2LoginRequest request = new Sub2LoginRequest();
+        request.setEmail(email);
+        request.setPassword(account.getPassword());
+
+        try {
+            log.info("开始登录 Sub2 账号，baseUrl={}，账号={}", baseUrl, email);
+            LoginResponse<Sub2LoginRes> response = client.post()
+                    .uri(LOGIN_PATH)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .exchangeToMono(clientResponse -> {
+                        HttpStatusCode status = clientResponse.statusCode();
+                        log.info("Sub2 登录接口响应，账号={}，状态码={}", email, status);
+                        if (status.is2xxSuccessful()) {
+                            return clientResponse.bodyToMono(Sub2LoginRes.class)
+                                    .map(body -> {
+                                        LoginResponse<Sub2LoginRes> wrapper = new LoginResponse<>();
+                                        wrapper.setHeaders(clientResponse.headers().asHttpHeaders());
+                                        wrapper.setBody(body);
+                                        return wrapper;
+                                    });
+                        }
+                        return clientResponse.bodyToMono(String.class)
+                                .flatMap(errorBody -> Mono.error(new WebClientResponseException(
+                                        "Sub2 login failed: " + errorBody,
+                                        status.value(),
+                                        status.toString(),
+                                        null,
+                                        errorBody.getBytes(StandardCharsets.UTF_8),
+                                        StandardCharsets.UTF_8
+                                )));
+                    })
+                    .retryWhen(Retry.fixedDelay(RETRY_TIMES, Duration.ofSeconds(RETRY_DELAY_SECONDS))
+                            .doBeforeRetry(retrySignal ->
+                                    log.warn("Sub2 账号登录重试，账号={}，第{}次，原因={}",
+                                            email,
+                                            retrySignal.totalRetries() + 1,
+                                            retrySignal.failure().getMessage())
+                            )
+                    )
+                    .block();
+            String accessToken = getAccessToken(response);
+            if (accessToken == null || accessToken.isBlank()) {
+                log.warn("Sub2 账号登录成功但未返回 access_token，账号={}，响应={}", email, response);
+                return null;
+            }
+            redisTemplate.opsForValue().set(buildAuthorizationCacheKey(baseUrl, email), accessToken, TOKEN_CACHE_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+            log.info("Sub2 账号登录成功并已缓存 token，账号={}，token长度={}", email, accessToken.length());
+            return response;
+        } catch (WebClientResponseException e) {
+            log.error("Sub2 账号登录最终失败，账号={}，HTTP状态码={}，响应体={}",
+                    email, e.getStatusCode(), e.getResponseBodyAsString());
+        } catch (Exception e) {
+            Throwable rootCause = Exceptions.unwrap(e);
+            log.error("Sub2 账号登录异常，账号={}，异常类型={}，原因={}",
+                    email, rootCause.getClass().getSimpleName(), rootCause.getMessage(), rootCause);
+        }
+        return null;
+    }
+
+    private String getTokenOrLogin(String baseUrl, Account account, WebClient client) {
+        String email = account.getEmail();
+        String token = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, email));
+        if (token != null && !token.isBlank()) {
+            return token;
+        }
+        log.info("Sub2 Redis 中未找到 token，准备登录刷新，账号={}，baseUrl={}", email, baseUrl);
+        LoginResponse<Sub2LoginRes> response = loginAccount(baseUrl, account, client.mutate().defaultHeader(HttpHeaders.ORIGIN, baseUrl).build());
+        token = getAccessToken(response);
+        return token == null || token.isBlank() ? null : token;
+    }
+
+    private Sub2AvailableGroupsResponse requestAvailableGroups(String baseUrl, String email, WebClient client, String token) {
+        return client.mutate()
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .build()
+                .get()
+                .uri(AVAILABLE_GROUPS_PATH)
+                .exchangeToMono(clientResponse -> {
+                    HttpStatusCode status = clientResponse.statusCode();
+                    if (status.is2xxSuccessful()) {
+                        return clientResponse.bodyToMono(Sub2AvailableGroupsResponse.class);
+                    }
+                    return clientResponse.bodyToMono(String.class)
+                            .flatMap(errorBody -> Mono.error(new WebClientResponseException(
+                                    "Sub2 available groups failed: " + errorBody,
+                                    status.value(),
+                                    status.toString(),
+                                    null,
+                                    errorBody.getBytes(StandardCharsets.UTF_8),
+                                    StandardCharsets.UTF_8
+                            )));
+                })
+                .block();
+    }
+
+    private Sub2KeysResponse requestSub2Keys(String baseUrl, String email, WebClient client, String token) {
+        return client.mutate()
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .build()
+                .get()
+                .uri(KEYS_PATH)
+                .exchangeToMono(clientResponse -> {
+                    HttpStatusCode status = clientResponse.statusCode();
+                    if (status.is2xxSuccessful()) {
+                        return clientResponse.bodyToMono(Sub2KeysResponse.class);
+                    }
+                    return clientResponse.bodyToMono(String.class)
+                            .flatMap(errorBody -> Mono.error(new WebClientResponseException(
+                                    "Sub2 keys failed: " + errorBody,
+                                    status.value(),
+                                    status.toString(),
+                                    null,
+                                    errorBody.getBytes(StandardCharsets.UTF_8),
+                                    StandardCharsets.UTF_8
+                            )));
+                })
+                .block();
+    }
+
+    private Sub2UsageStatsResponse requestUsageStats(WebClient client, String token) {
+        return client.mutate()
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .build()
+                .get()
+                .uri(USAGE_STATS_PATH)
+                .exchangeToMono(clientResponse -> {
+                    HttpStatusCode status = clientResponse.statusCode();
+                    if (status.is2xxSuccessful()) {
+                        return clientResponse.bodyToMono(Sub2UsageStatsResponse.class);
+                    }
+                    return clientResponse.bodyToMono(String.class)
+                            .flatMap(errorBody -> Mono.error(new WebClientResponseException(
+                                    "Sub2 usage stats failed: " + errorBody,
+                                    status.value(),
+                                    status.toString(),
+                                    null,
+                                    errorBody.getBytes(StandardCharsets.UTF_8),
+                                    StandardCharsets.UTF_8
+                            )));
+                })
+                .block();
+    }
+
+    private Sub2UserInfoResponse requestUserInfo(WebClient client, String token) {
+        return client.mutate()
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .build()
+                .get()
+                .uri(USER_INFO_PATH)
+                .exchangeToMono(clientResponse -> {
+                    HttpStatusCode status = clientResponse.statusCode();
+                    if (status.is2xxSuccessful()) {
+                        return clientResponse.bodyToMono(Sub2UserInfoResponse.class);
+                    }
+                    return clientResponse.bodyToMono(String.class)
+                            .flatMap(errorBody -> Mono.error(new WebClientResponseException(
+                                    "Sub2 user info failed: " + errorBody,
+                                    status.value(),
+                                    status.toString(),
+                                    null,
+                                    errorBody.getBytes(StandardCharsets.UTF_8),
+                                    StandardCharsets.UTF_8
+                            )));
+                })
+                .block();
+    }
+
+    private boolean isAuthFailure(Throwable throwable) {
+        return throwable instanceof WebClientResponseException responseException
+                && (responseException.getStatusCode().value() == 401 || responseException.getStatusCode().value() == 403);
     }
 
     /**
