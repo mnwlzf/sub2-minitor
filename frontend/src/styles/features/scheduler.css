@@ -88,4 +88,88 @@
   color: #667085;
 }
 
+.log-filter-card {
+  overflow: hidden;
+}
+
+.log-filter-card .el-card__header {
+  padding: 18px 24px;
+}
+
+.log-filter-card .el-card__body {
+  padding: 22px 24px;
+}
+
+.log-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 38px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.log-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.log-search {
+  width: 280px;
+}
+
+.log-status-filter {
+  width: 140px;
+}
+
+.log-date-picker {
+  width: 280px;
+}
+
+.log-table-scroll {
+  overflow: auto hidden;
+  cursor: grab;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.log-table-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.log-table-scroll.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.log-table {
+  --el-table-header-text-color: #7b8798;
+  --el-table-text-color: #334155;
+  min-width: 1100px;
+  font-size: 14px;
+}
+
+.log-table .el-table__header th {
+  height: 42px;
+  font-weight: 700;
+}
+
+.log-table .el-table__row {
+  height: 44px;
+}
+
+.log-table .is-success td {
+  background: #f7fff9;
+}
+
+.log-table .is-failure td {
+  background: #fff7f7;
+}
+
 

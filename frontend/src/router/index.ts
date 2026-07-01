@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import OverviewView from '../features/overview/OverviewView.vue'
 import PlatformView from '../features/platform/PlatformView.vue'
 import SchedulerTaskView from '../features/scheduler/SchedulerTaskView.vue'
+import SchedulerLogView from '../features/scheduler/SchedulerLogView.vue'
 import GroupView from '../features/group/GroupView.vue'
 import BalanceView from '../features/balance/BalanceView.vue'
 import AccountView from '../features/account/AccountView.vue'
@@ -28,6 +29,11 @@ const router = createRouter({
       path: '/scheduler/tasks',
       name: 'scheduler-tasks',
       component: SchedulerTaskView,
+    },
+    {
+      path: '/scheduler/logs',
+      name: 'scheduler-logs',
+      component: SchedulerLogView,
     },
     {
       path: '/groups',

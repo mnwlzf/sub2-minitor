@@ -1,5 +1,11 @@
 import { http } from '../../api/http'
-import type { SchedulerTask, SchedulerTaskForm, SchedulerTaskOption } from './scheduler.types'
+import type {
+  SchedulerTask,
+  SchedulerTaskForm,
+  SchedulerTaskLog,
+  SchedulerTaskLogQuery,
+  SchedulerTaskOption,
+} from './scheduler.types'
 
 export const schedulerTaskTypeOptions: SchedulerTaskOption[] = [
   { label: '数据采集', value: 'DATA_COLLECT' },
@@ -38,5 +44,10 @@ export const triggerSchedulerTask = async (id: number) => {
 
 export const syncSchedulerTasks = async () => {
   await http.post('/scheduler/tasks/sync')
+}
+
+export const listSchedulerTaskLogs = async (params: SchedulerTaskLogQuery) => {
+  const { data } = await http.get<SchedulerTaskLog[]>('/scheduler/logs', { params })
+  return data
 }
 

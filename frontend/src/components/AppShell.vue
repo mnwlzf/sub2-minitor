@@ -40,7 +40,7 @@
             <span>定时任务</span>
           </template>
           <el-menu-item index="/scheduler/tasks">任务编辑</el-menu-item>
-          <el-menu-item index="/scheduler/logs" disabled>日志查看</el-menu-item>
+          <el-menu-item index="/scheduler/logs">日志查看</el-menu-item>
         </el-sub-menu>
       </el-menu>
     </aside>
@@ -98,6 +98,9 @@ const activeMenu = computed(() => {
   }
   if (route.path.startsWith('/scheduler/tasks')) {
     return '/scheduler/tasks'
+  }
+  if (route.path.startsWith('/scheduler/logs')) {
+    return '/scheduler/logs'
   }
   if (route.path.startsWith('/groups')) {
     return '/groups'
