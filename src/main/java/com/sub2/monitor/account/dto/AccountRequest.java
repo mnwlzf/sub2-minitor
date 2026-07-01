@@ -1,4 +1,4 @@
-package com.sub2.monitor.monitor.dto;
+package com.sub2.monitor.account.dto;
 
 import lombok.Data;
 
@@ -11,3 +11,4 @@ public class AccountRequest {
     private String testModel;
     private Boolean isCollect;
 }
+

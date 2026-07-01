@@ -1,11 +1,11 @@
-package com.sub2.monitor.collect.service.impl;
+package com.sub2.monitor.balance.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.sub2.monitor.collect.dto.BalanceHistoryQueryRequest;
-import com.sub2.monitor.collect.dto.BalanceHistoryResponse;
+import com.sub2.monitor.balance.dto.BalanceHistoryQueryRequest;
+import com.sub2.monitor.balance.dto.BalanceHistoryResponse;
 import com.sub2.monitor.collect.entity.AccountBalanceRecord;
 import com.sub2.monitor.collect.mapper.AccountBalanceRecordMapper;
-import com.sub2.monitor.collect.service.BalanceHistoryQueryService;
+import com.sub2.monitor.balance.service.BalanceHistoryQueryService;
 import com.sub2.monitor.monitor.entity.Platform;
 import com.sub2.monitor.monitor.mapper.PlatformMapper;
 import lombok.RequiredArgsConstructor;
@@ -131,3 +131,4 @@ public class BalanceHistoryQueryServiceImpl implements BalanceHistoryQueryServic
         return "identity:" + record.getAccountIdentity();
     }
 }
+

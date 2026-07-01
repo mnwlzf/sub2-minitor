@@ -1,8 +1,8 @@
-package com.sub2.monitor.collect.controller;
+package com.sub2.monitor.balance.controller;
 
-import com.sub2.monitor.collect.dto.BalanceHistoryQueryRequest;
-import com.sub2.monitor.collect.dto.BalanceHistoryResponse;
-import com.sub2.monitor.collect.service.BalanceHistoryQueryService;
+import com.sub2.monitor.balance.dto.BalanceHistoryQueryRequest;
+import com.sub2.monitor.balance.dto.BalanceHistoryResponse;
+import com.sub2.monitor.balance.service.BalanceHistoryQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,3 +20,4 @@ public class BalanceHistoryController {
         return balanceHistoryQueryService.listBalances(request);
     }
 }
+

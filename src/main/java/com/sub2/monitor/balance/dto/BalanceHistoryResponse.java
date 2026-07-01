@@ -1,4 +1,4 @@
-package com.sub2.monitor.collect.dto;
+package com.sub2.monitor.balance.dto;
 
 import lombok.Data;
 
@@ -37,3 +37,4 @@ public class BalanceHistoryResponse {
         private BigDecimal balance;
     }
 }
+

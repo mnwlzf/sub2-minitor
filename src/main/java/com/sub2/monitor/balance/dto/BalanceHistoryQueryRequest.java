@@ -1,4 +1,4 @@
-package com.sub2.monitor.collect.dto;
+package com.sub2.monitor.balance.dto;
 
 import lombok.Data;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -18,3 +18,4 @@ public class BalanceHistoryQueryRequest {
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate endDate;
 }
+

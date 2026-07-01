@@ -1,8 +1,8 @@
-package com.sub2.monitor.monitor.service;
+package com.sub2.monitor.account.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.sub2.monitor.monitor.dto.AccountRequest;
-import com.sub2.monitor.monitor.dto.AccountResponse;
+import com.sub2.monitor.account.dto.AccountRequest;
+import com.sub2.monitor.account.dto.AccountResponse;
 import com.sub2.monitor.monitor.entity.Account;
 
 import java.util.List;
@@ -17,3 +17,4 @@ public interface AccountService extends IService<Account> {
 
     void deleteAccount(Long id);
 }
+

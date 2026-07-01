@@ -1,14 +1,14 @@
-package com.sub2.monitor.monitor.service.impl;
+package com.sub2.monitor.account.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.sub2.monitor.monitor.dto.AccountRequest;
-import com.sub2.monitor.monitor.dto.AccountResponse;
+import com.sub2.monitor.account.dto.AccountRequest;
+import com.sub2.monitor.account.dto.AccountResponse;
 import com.sub2.monitor.monitor.entity.Account;
 import com.sub2.monitor.monitor.entity.Platform;
 import com.sub2.monitor.monitor.mapper.AccountMapper;
 import com.sub2.monitor.monitor.mapper.PlatformMapper;
-import com.sub2.monitor.monitor.service.AccountService;
+import com.sub2.monitor.account.service.AccountService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -129,3 +129,4 @@ public class AccountServiceImpl extends ServiceImpl<AccountMapper, Account> impl
     }
 
 }
+

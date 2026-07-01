@@ -1,8 +1,8 @@
-package com.sub2.monitor.monitor.controller;
+package com.sub2.monitor.account.controller;
 
-import com.sub2.monitor.monitor.dto.AccountRequest;
-import com.sub2.monitor.monitor.dto.AccountResponse;
-import com.sub2.monitor.monitor.service.AccountService;
+import com.sub2.monitor.account.dto.AccountRequest;
+import com.sub2.monitor.account.dto.AccountResponse;
+import com.sub2.monitor.account.service.AccountService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,3 +46,4 @@ public class AccountController {
         accountService.deleteAccount(id);
     }
 }
+
