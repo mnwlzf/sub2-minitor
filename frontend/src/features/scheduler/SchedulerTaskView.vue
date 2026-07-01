@@ -161,8 +161,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import AppShell from '../components/AppShell.vue'
-import type { SchedulerTask, SchedulerTaskForm } from '../types/scheduler'
+import AppShell from '../../components/AppShell.vue'
+import type { SchedulerTask, SchedulerTaskForm } from './scheduler.types'
 import {
   createSchedulerTask,
   deleteSchedulerTask,
@@ -172,7 +172,7 @@ import {
   schedulerTaskTypeOptions,
   triggerSchedulerTask,
   updateSchedulerTask,
-} from '../api/scheduler'
+} from './scheduler.api'
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -395,3 +395,4 @@ const executionClass = (taskType: string) => {
 
 onMounted(loadTasks)
 </script>
+

@@ -68,3 +68,4 @@ export const updateMailScene = async (id: number, payload: MailNotifySceneForm) 
 export const deleteMailScene = async (id: number) => {
   await http.delete(`/mail/scenes/${id}`)
 }
+

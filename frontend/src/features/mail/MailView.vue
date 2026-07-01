@@ -606,3 +606,4 @@ const handleSmtpTest = async (item: MailSmtpConfigItem) => {
 
 onMounted(loadAll)
 </script>
+

@@ -1,27 +1,7 @@
-export interface CollectGroupResponse {
-  items: PlatformGroupItem[]
-  total: number
-}
+export type {
+  CollectGroupResponse,
+  GroupItem,
+  PlatformGroupItem,
+} from '../features/group/group.types'
 
-export interface PlatformGroupItem {
-  platformId: number
-  platformName: string
-  platformType: string
-  baseUrl: string
-  enabled: boolean
-  groupCount: number
-  rechargeRatio?: number | null
-  discountRatio?: number | null
-  lastCollectedAt?: string | null
-  groups: GroupItem[]
-}
-
-export interface GroupItem {
-  id: number
-  groupName: string
-  description?: string | null
-  platformRate?: number | null
-  actualRate?: number | null
-  status?: string | null
-  lastCollectedAt?: string | null
-}
+export type { GroupItem as CollectGroupItem } from '../features/group/group.types'

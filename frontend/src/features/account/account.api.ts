@@ -19,3 +19,4 @@ export const updateAccount = async (id: number, payload: AccountForm) => {
 export const deleteAccount = async (id: number) => {
   await http.delete(`/monitor/accounts/${id}`)
 }
+

@@ -1,14 +1,4 @@
-import { http } from './http'
-import type { BalanceHistoryResponse } from '../types/balance'
-
-export interface BalanceHistoryParams {
-  keyword?: string
-  enabled?: boolean | null
-  startDate?: string
-  endDate?: string
-}
-
-export const listBalanceHistory = async (params: BalanceHistoryParams) => {
-  const { data } = await http.get<BalanceHistoryResponse>('/collect/balances', { params })
-  return data
-}
+export {
+  listBalanceHistory,
+} from '../features/balance/balance.api'
+export type { BalanceHistoryParams } from '../features/balance/balance.api'

@@ -45,8 +45,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import AppShell from '../components/AppShell.vue'
-import { http } from '../api/http'
+import AppShell from '../../components/AppShell.vue'
+import { http } from '../../api/http'
 
 const router = useRouter()
 const healthOk = ref(false)
@@ -69,3 +69,4 @@ const loadHealth = async () => {
 
 onMounted(loadHealth)
 </script>
+

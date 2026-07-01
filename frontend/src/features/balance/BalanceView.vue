@@ -66,10 +66,10 @@
 import * as echarts from 'echarts'
 import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import AppShell from '../components/AppShell.vue'
-import { listBalanceHistory } from '../api/balance'
-import type { BalancePoint, PlatformBalanceItem } from '../types/balance'
-import type { AccountBalanceItem } from '../types/balance'
+import AppShell from '../../components/AppShell.vue'
+import { listBalanceHistory } from './balance.api'
+import type { BalancePoint, PlatformBalanceItem } from './balance.types'
+import type { AccountBalanceItem } from './balance.types'
 
 type RangeMode = 'today' | 'threeDays' | 'sevenDays' | 'custom'
 
@@ -285,3 +285,4 @@ onMounted(() => {
   loadBalances()
 })
 </script>
+

@@ -159,8 +159,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import AppShell from '../components/AppShell.vue'
-import type { PlatformForm, PlatformItem, PlatformSummary } from '../types/platform'
+import AppShell from '../../components/AppShell.vue'
+import type { PlatformForm, PlatformItem, PlatformSummary } from './platform.types'
 import {
   collectPlatform,
   createPlatform,
@@ -168,7 +168,7 @@ import {
   enablePlatform,
   listPlatforms,
   updatePlatform,
-} from '../api/platform'
+} from './platform.api'
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -302,3 +302,4 @@ const formatDate = (value: string) => value.replace('T', ' ').slice(0, 16)
 
 onMounted(loadPlatforms)
 </script>
+

@@ -102,9 +102,9 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'elem
 import { Plus, Search } from '@element-plus/icons-vue'
 import AppShell from '../../components/AppShell.vue'
 import { createAccount, deleteAccount, listAccounts, updateAccount } from './account.api'
-import { listPlatforms } from '../../api/platform'
+import { listPlatforms } from '../platform/platform.api'
 import type { AccountForm, AccountItem } from './account.types'
-import type { PlatformItem } from '../../types/platform'
+import type { PlatformItem } from '../platform/platform.types'
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -258,3 +258,4 @@ onMounted(async () => {
   await loadAccounts()
 })
 </script>
+

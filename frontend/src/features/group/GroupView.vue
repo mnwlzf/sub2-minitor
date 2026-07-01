@@ -94,9 +94,9 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { listCollectGroups } from '../api/group'
-import AppShell from '../components/AppShell.vue'
-import type { GroupItem, PlatformGroupItem } from '../types/group'
+import { listCollectGroups } from './group.api'
+import AppShell from '../../components/AppShell.vue'
+import type { GroupItem, PlatformGroupItem } from './group.types'
 
 const loading = ref(false)
 const platforms = ref<PlatformGroupItem[]>([])
@@ -128,3 +128,4 @@ const isChanged = (group: GroupItem) => Number(group.platformRate ?? 0) !== Numb
 
 onMounted(loadGroups)
 </script>
+
