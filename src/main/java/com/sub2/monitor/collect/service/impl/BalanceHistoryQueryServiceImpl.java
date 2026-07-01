@@ -1,6 +1,7 @@
 package com.sub2.monitor.collect.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.sub2.monitor.collect.dto.BalanceHistoryQueryRequest;
 import com.sub2.monitor.collect.dto.BalanceHistoryResponse;
 import com.sub2.monitor.collect.entity.AccountBalanceRecord;
 import com.sub2.monitor.collect.mapper.AccountBalanceRecordMapper;
@@ -13,6 +14,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,22 +29,33 @@ public class BalanceHistoryQueryServiceImpl implements BalanceHistoryQueryServic
     private final AccountBalanceRecordMapper accountBalanceRecordMapper;
 
     @Override
-    public BalanceHistoryResponse listBalances(String keyword, Boolean enabled) {
+    public BalanceHistoryResponse listBalances(BalanceHistoryQueryRequest request) {
+        BalanceHistoryQueryRequest query = request == null ? new BalanceHistoryQueryRequest() : request;
+        LocalDate resolvedEndDate = query.getEndDate() == null ? LocalDate.now() : query.getEndDate();
+        LocalDate resolvedStartDate = query.getStartDate() == null ? resolvedEndDate.minusDays(2) : query.getStartDate();
+        if (resolvedStartDate.isAfter(resolvedEndDate)) {
+            LocalDate temp = resolvedStartDate;
+            resolvedStartDate = resolvedEndDate;
+            resolvedEndDate = temp;
+        }
+        LocalDateTime rangeStart = resolvedStartDate.atStartOfDay();
+        LocalDateTime rangeEndExclusive = resolvedEndDate.plusDays(1).atStartOfDay();
+
         LambdaQueryWrapper<Platform> wrapper = new LambdaQueryWrapper<>();
-        if (StringUtils.hasText(keyword)) {
-            wrapper.and(query -> query
-                    .like(Platform::getPlatformName, keyword)
+        if (StringUtils.hasText(query.getKeyword())) {
+            wrapper.and(platformQuery -> platformQuery
+                    .like(Platform::getPlatformName, query.getKeyword())
                     .or()
-                    .like(Platform::getBaseUrl, keyword)
+                    .like(Platform::getBaseUrl, query.getKeyword())
             );
         }
-        if (enabled != null) {
-            wrapper.eq(Platform::getEnabled, enabled);
+        if (query.getEnabled() != null) {
+            wrapper.eq(Platform::getEnabled, query.getEnabled());
         }
         wrapper.orderByDesc(Platform::getId);
 
         List<BalanceHistoryResponse.PlatformBalanceItem> items = platformMapper.selectList(wrapper).stream()
-                .map(this::toPlatformBalanceItem)
+                .map(platform -> toPlatformBalanceItem(platform, rangeStart, rangeEndExclusive))
                 .toList();
 
         BalanceHistoryResponse response = new BalanceHistoryResponse();
@@ -51,9 +64,15 @@ public class BalanceHistoryQueryServiceImpl implements BalanceHistoryQueryServic
         return response;
     }
 
-    private BalanceHistoryResponse.PlatformBalanceItem toPlatformBalanceItem(Platform platform) {
+    private BalanceHistoryResponse.PlatformBalanceItem toPlatformBalanceItem(
+            Platform platform,
+            LocalDateTime rangeStart,
+            LocalDateTime rangeEndExclusive
+    ) {
         List<AccountBalanceRecord> records = accountBalanceRecordMapper.selectList(new LambdaQueryWrapper<AccountBalanceRecord>()
                 .eq(AccountBalanceRecord::getPlatformId, platform.getId())
+                .ge(AccountBalanceRecord::getCollectedAt, rangeStart)
+                .lt(AccountBalanceRecord::getCollectedAt, rangeEndExclusive)
                 .orderByAsc(AccountBalanceRecord::getCollectedAt)
                 .orderByAsc(AccountBalanceRecord::getId));
 
