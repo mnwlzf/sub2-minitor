@@ -258,7 +258,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import AppShell from '../components/AppShell.vue'
+import AppShell from '../../components/AppShell.vue'
 import {
   createMailRecipient,
   createMailScene,
@@ -273,7 +273,7 @@ import {
   updateMailRecipient,
   updateMailScene,
   updateMailSmtpConfig,
-} from '../api/mail'
+} from './mail.api'
 import type {
   MailNotifySceneForm,
   MailNotifySceneItem,
@@ -281,7 +281,7 @@ import type {
   MailRecipientItem,
   MailSmtpConfigForm,
   MailSmtpConfigItem,
-} from '../types/mail'
+} from './mail.types'
 
 const loading = ref(false)
 const activeTab = ref('smtp')

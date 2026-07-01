@@ -4,8 +4,8 @@ import PlatformView from '../views/PlatformView.vue'
 import SchedulerTaskView from '../views/SchedulerTaskView.vue'
 import GroupView from '../views/GroupView.vue'
 import BalanceView from '../views/BalanceView.vue'
-import AccountView from '../views/AccountView.vue'
-import MailView from '../views/MailView.vue'
+import AccountView from '../features/account/AccountView.vue'
+import MailView from '../features/mail/MailView.vue'
 
 const router = createRouter({
   history: createWebHistory(),

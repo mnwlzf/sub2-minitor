@@ -100,11 +100,11 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
-import AppShell from '../components/AppShell.vue'
-import { createAccount, deleteAccount, listAccounts, updateAccount } from '../api/account'
-import { listPlatforms } from '../api/platform'
-import type { AccountForm, AccountItem } from '../types/account'
-import type { PlatformItem } from '../types/platform'
+import AppShell from '../../components/AppShell.vue'
+import { createAccount, deleteAccount, listAccounts, updateAccount } from './account.api'
+import { listPlatforms } from '../../api/platform'
+import type { AccountForm, AccountItem } from './account.types'
+import type { PlatformItem } from '../../types/platform'
 
 const loading = ref(false)
 const submitLoading = ref(false)
