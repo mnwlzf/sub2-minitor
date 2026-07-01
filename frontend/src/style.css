@@ -388,7 +388,15 @@ body,
   overflow: hidden;
 }
 
+.account-panel {
+  overflow: hidden;
+}
+
 .platform-panel .el-card__header {
+  padding: 18px 24px;
+}
+
+.account-panel .el-card__header {
   padding: 18px 24px;
 }
 
@@ -396,7 +404,21 @@ body,
   padding: 0;
 }
 
+.account-panel .el-card__body {
+  padding: 0;
+}
+
 .platform-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 38px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.account-panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -413,12 +435,29 @@ body,
   flex: 1;
 }
 
+.account-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
 .platform-search {
   width: 320px;
 }
 
+.account-search {
+  width: 260px;
+}
+
 .platform-status-filter {
   width: 150px;
+}
+
+.account-platform-filter {
+  width: 220px;
 }
 
 .platform-summary {
@@ -458,12 +497,37 @@ body,
   padding: 18px 20px 24px;
 }
 
+.account-manage-list {
+  display: grid;
+  gap: 12px;
+  min-height: 220px;
+  padding: 18px 20px 24px;
+}
+
 .platform-item {
   padding: 16px;
   border: 1px solid #dfe8f5;
   border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.account-manage-item {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(160px, 0.35fr) minmax(160px, 0.35fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 78px;
+  padding: 14px 16px;
+  border: 1px solid #dfe8f5;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.035);
+}
+
+.account-manage-item:hover {
+  border-color: #c7d7ee;
+  background: #fbfdff;
 }
 
 .platform-item-head,
@@ -613,6 +677,41 @@ body,
   margin-top: 2px;
   color: #667085;
   font-size: 12px;
+}
+
+.account-field {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #f8fbff;
+}
+
+.account-field span {
+  display: block;
+  margin-bottom: 4px;
+  color: #667085;
+  font-size: 12px;
+}
+
+.account-field strong {
+  display: block;
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  white-space: nowrap;
+}
+
+.account-actions .el-button + .el-button {
+  margin-left: 0;
 }
 
 .group-tags {
@@ -947,6 +1046,182 @@ body,
   font-size: 13px;
 }
 
+.mail-page-head {
+  margin-bottom: 18px;
+}
+
+.mail-page-head h2 {
+  margin: 0 0 8px;
+  color: #101828;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.mail-page-head p {
+  margin: 0;
+  color: #667085;
+}
+
+.mail-tabs {
+  margin-bottom: 16px;
+}
+
+.mail-section {
+  margin-bottom: 18px;
+}
+
+.mail-section-card {
+  padding: 0;
+  border: 1px solid #dfe8f5;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.mail-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #e5edf6;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.mail-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.mail-list {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px 18px;
+}
+
+.mail-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid #dfe8f5;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.mail-main strong,
+.scene-card strong {
+  display: block;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.mail-main span,
+.mail-meta span,
+.scene-card p,
+.scene-empty {
+  color: #667085;
+  font-size: 13px;
+}
+
+.mail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.mail-ops {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.mail-table {
+  width: 100%;
+}
+
+.scene-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 16px 18px 18px;
+}
+
+.scene-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #dfe8f5;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.scene-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scene-card-head p {
+  margin: 4px 0 0;
+}
+
+.scene-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.scene-body {
+  display: grid;
+  gap: 10px;
+}
+
+.scene-line {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.scene-line span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: #eef4ff;
+  color: #3258b8;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.recipient-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 28px;
+  align-items: center;
+}
+
+.scene-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.mail-form .el-form-item {
+  margin-bottom: 16px;
+}
+
 @media (max-width: 1100px) {
   .layout,
   .hero-grid,
@@ -963,6 +1238,8 @@ body,
   .task-toolbar,
   .platform-panel-head,
   .platform-toolbar,
+  .account-panel-head,
+  .account-toolbar,
   .platform-item-head,
   .platform-actions,
   .platform-summary {
@@ -973,12 +1250,23 @@ body,
   .task-search,
   .task-group-filter,
   .platform-search,
-  .platform-status-filter {
+  .platform-status-filter,
+  .account-search,
+  .account-platform-filter {
     width: 100%;
   }
 
   .platform-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .account-manage-item {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .account-actions {
+    justify-content: flex-start;
   }
 
   .account-card,
@@ -990,6 +1278,22 @@ body,
 
   .account-stats > div {
     text-align: left;
+  }
+
+  .mail-row,
+  .scene-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mail-section-head,
+  .scene-card-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mail-ops,
+  .scene-actions {
+    justify-content: flex-start;
   }
 }
 
@@ -1031,5 +1335,14 @@ body,
   .balance-date-picker {
     width: 100%;
   }
-}
 
+  .mail-section-head,
+  .mail-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .scene-line {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,9 @@
+package com.sub2.monitor.mail.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.sub2.monitor.mail.entity.MailNotifySceneRecipient;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface MailNotifySceneRecipientMapper extends BaseMapper<MailNotifySceneRecipient> {
+}

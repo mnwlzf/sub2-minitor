@@ -4,6 +4,8 @@ import PlatformView from '../views/PlatformView.vue'
 import SchedulerTaskView from '../views/SchedulerTaskView.vue'
 import GroupView from '../views/GroupView.vue'
 import BalanceView from '../views/BalanceView.vue'
+import AccountView from '../views/AccountView.vue'
+import MailView from '../views/MailView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -36,6 +38,16 @@ const router = createRouter({
       path: '/balances',
       name: 'balances',
       component: BalanceView,
+    },
+    {
+      path: '/accounts',
+      name: 'accounts',
+      component: AccountView,
+    },
+    {
+      path: '/mail',
+      name: 'mail',
+      component: MailView,
     },
   ],
 })

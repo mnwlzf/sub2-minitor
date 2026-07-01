@@ -22,7 +22,7 @@
           <el-icon><TrendCharts /></el-icon>
           <span>余额查看</span>
         </el-menu-item>
-        <el-menu-item index="/accounts" disabled>
+        <el-menu-item index="/accounts">
           <el-icon><User /></el-icon>
           <span>账号管理</span>
         </el-menu-item>
@@ -30,7 +30,7 @@
           <el-icon><Collection /></el-icon>
           <span>分组查看</span>
         </el-menu-item>
-        <el-menu-item index="/mail" disabled>
+        <el-menu-item index="/mail">
           <el-icon><Message /></el-icon>
           <span>邮件设置</span>
         </el-menu-item>
@@ -92,6 +92,9 @@ const activeMenu = computed(() => {
   }
   if (route.path.startsWith('/balances')) {
     return '/balances'
+  }
+  if (route.path.startsWith('/accounts')) {
+    return '/accounts'
   }
   if (route.path.startsWith('/scheduler/tasks')) {
     return '/scheduler/tasks'
