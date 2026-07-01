@@ -1,0 +1,214 @@
+.group-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.account-stats {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.account-stats > div {
+  min-width: 86px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f8fbff;
+  text-align: right;
+}
+
+.account-stats span {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+}
+
+.account-stats strong {
+  display: block;
+  margin-top: 4px;
+  color: #0f172a;
+  font-size: 16px;
+}
+
+.account-stats strong.danger {
+  color: #ef4444;
+}
+
+.group-panel {
+  overflow: hidden;
+}
+
+.group-panel .el-card__header {
+  padding: 18px 24px;
+}
+
+.group-panel .el-card__body {
+  padding: 0;
+}
+
+.group-panel-head,
+.group-toolbar,
+.group-platform-head,
+.group-platform-title,
+.group-platform-stats,
+.group-card-head,
+.group-card-foot,
+.group-pagination {
+  display: flex;
+  align-items: center;
+}
+
+.group-panel-head {
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  min-height: 38px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.group-toolbar {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  flex: 1;
+}
+
+.group-search {
+  width: min(320px, 100%);
+}
+
+.group-status-filter {
+  width: 150px;
+}
+
+.group-platform-list {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+}
+
+.group-platform-card {
+  padding: 18px;
+  border: 1px solid #dfe8f5;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.group-platform-head {
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.group-platform-title {
+  gap: 12px;
+  min-width: 0;
+}
+
+.group-platform-stats {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1 1 520px;
+}
+
+.group-platform-stats > div {
+  min-width: 110px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #f8fbff;
+  text-align: right;
+}
+
+.group-platform-stats span {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+}
+
+.group-platform-stats strong {
+  display: block;
+  margin-top: 4px;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.group-card {
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 1px solid #dfe8f5;
+  border-radius: 6px;
+  background: #fbfdff;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.035);
+}
+
+.group-card.changed {
+  border-color: #facc15;
+  background: #fffbeb;
+}
+
+.group-card-head,
+.group-card-foot {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.group-card-head strong {
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-card-head span {
+  flex: 0 0 auto;
+  color: #667085;
+  font-size: 12px;
+}
+
+.group-card-foot {
+  margin-top: 8px;
+}
+
+.group-card-foot span {
+  color: #667085;
+  font-size: 12px;
+}
+
+.group-card-foot em {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #e8fff5;
+  color: #047857;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.group-pagination {
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 0 20px 20px;
+  color: #667085;
+}
+
+.group-page-size {
+  width: 96px;
+}
+
+

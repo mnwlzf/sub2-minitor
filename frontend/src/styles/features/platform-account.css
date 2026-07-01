@@ -1,0 +1,331 @@
+.platform-panel {
+  overflow: hidden;
+}
+
+.account-panel {
+  overflow: hidden;
+}
+
+.platform-panel .el-card__header {
+  padding: 18px 24px;
+}
+
+.account-panel .el-card__header {
+  padding: 18px 24px;
+}
+
+.platform-panel .el-card__body {
+  padding: 0;
+}
+
+.account-panel .el-card__body {
+  padding: 0;
+}
+
+.platform-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 38px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.account-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 38px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.platform-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex: 1;
+}
+
+.account-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.platform-search {
+  width: 320px;
+}
+
+.account-search {
+  width: 260px;
+}
+
+.platform-status-filter {
+  width: 150px;
+}
+
+.account-platform-filter {
+  width: 220px;
+}
+
+.platform-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 24px;
+  border-bottom: 1px solid #e5edf6;
+}
+
+.summary-title,
+.summary-sub,
+.platform-url,
+.account-placeholder span {
+  color: #667085;
+}
+
+.summary-line {
+  display: flex;
+  gap: 16px;
+  margin: 8px 0 4px;
+  color: #172033;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.platform-list {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px 24px;
+}
+
+.account-manage-list {
+  display: grid;
+  gap: 12px;
+  min-height: 220px;
+  padding: 18px 20px 24px;
+}
+
+.platform-item {
+  padding: 16px;
+  border: 1px solid #dfe8f5;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.account-manage-item {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(160px, 0.35fr) minmax(160px, 0.35fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 78px;
+  padding: 14px 16px;
+  border: 1px solid #dfe8f5;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.035);
+}
+
+.account-manage-item:hover {
+  border-color: #c7d7ee;
+  background: #fbfdff;
+}
+
+.platform-item-head,
+.platform-name-line,
+.platform-title,
+.platform-actions {
+  display: flex;
+  align-items: center;
+}
+
+.platform-item-head {
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.platform-title {
+  gap: 14px;
+  min-width: 0;
+}
+
+.platform-avatar {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  background: #eaf2ff;
+  color: #2563eb;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.platform-name-line {
+  gap: 8px;
+  min-width: 0;
+}
+
+.platform-name {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.platform-url {
+  margin-top: 3px;
+  font-size: 14px;
+}
+
+.platform-actions {
+  gap: 12px;
+  color: #475467;
+  white-space: nowrap;
+}
+
+.platform-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.metric-box {
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: #f8fbff;
+}
+
+.metric-box span {
+  display: block;
+  color: #667085;
+  margin-bottom: 8px;
+}
+
+.metric-box strong {
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.metric-box strong.danger {
+  color: #ef4444;
+}
+
+.platform-account {
+  margin-top: 14px;
+}
+
+.account-section-title {
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.account-placeholder,
+.account-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e5edf6;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.account-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.account-avatar {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 6px;
+  background: #eef5ff;
+  color: #2563eb;
+  font-weight: 800;
+}
+
+.account-info {
+  min-width: 0;
+}
+
+.account-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.account-name {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.account-time {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.account-subline {
+  margin-top: 2px;
+  color: #667085;
+  font-size: 12px;
+}
+
+.account-field {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #f8fbff;
+}
+
+.account-field span {
+  display: block;
+  margin-bottom: 4px;
+  color: #667085;
+  font-size: 12px;
+}
+
+.account-field strong {
+  display: block;
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  white-space: nowrap;
+}
+
+.account-actions .el-button + .el-button {
+  margin-left: 0;
+}
+
+

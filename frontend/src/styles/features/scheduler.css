@@ -1,0 +1,91 @@
+.task-form .el-form-item {
+  margin-bottom: 18px;
+}
+
+.task-form .el-form-item__label {
+  white-space: nowrap;
+  padding-right: 14px;
+}
+
+.task-form .el-input,
+.task-form .el-select,
+.task-form .el-textarea {
+  width: 100%;
+}
+
+.task-form .el-switch {
+  min-height: 32px;
+}
+
+.task-form-divider {
+  margin: 18px 0 20px;
+}
+
+.task-panel {
+  overflow: hidden;
+}
+
+.task-panel .el-card__header {
+  padding: 18px 24px;
+}
+
+.task-panel .el-card__body {
+  padding: 22px 24px;
+}
+
+.task-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 38px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.task-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.task-search {
+  width: 320px;
+}
+
+.task-group-filter {
+  width: 160px;
+}
+
+.task-table {
+  --el-table-header-text-color: #7b8798;
+  --el-table-text-color: #334155;
+  font-size: 14px;
+}
+
+.task-table .el-table__header th {
+  height: 42px;
+  font-weight: 700;
+}
+
+.task-table .el-table__row {
+  height: 44px;
+}
+
+.task-table .el-button + .el-button {
+  margin-left: 10px;
+}
+
+.task-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  padding-top: 18px;
+  color: #667085;
+}
+
+

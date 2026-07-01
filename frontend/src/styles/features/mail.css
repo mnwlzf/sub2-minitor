@@ -1,0 +1,177 @@
+.mail-page-head {
+  margin-bottom: 18px;
+}
+
+.mail-page-head h2 {
+  margin: 0 0 8px;
+  color: #101828;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.mail-page-head p {
+  margin: 0;
+  color: #667085;
+}
+
+.mail-tabs {
+  margin-bottom: 16px;
+}
+
+.mail-section {
+  margin-bottom: 18px;
+}
+
+.mail-section-card {
+  padding: 0;
+  border: 1px solid #dfe8f5;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.mail-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #e5edf6;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.mail-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.mail-list {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px 18px;
+}
+
+.mail-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid #dfe8f5;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.mail-main strong,
+.scene-card strong {
+  display: block;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.mail-main span,
+.mail-meta span,
+.scene-card p,
+.scene-empty {
+  color: #667085;
+  font-size: 13px;
+}
+
+.mail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.mail-ops {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.mail-table {
+  width: 100%;
+}
+
+.scene-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 16px 18px 18px;
+}
+
+.scene-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #dfe8f5;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.scene-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scene-card-head p {
+  margin: 4px 0 0;
+}
+
+.scene-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.scene-body {
+  display: grid;
+  gap: 10px;
+}
+
+.scene-line {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.scene-line span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: #eef4ff;
+  color: #3258b8;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.recipient-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 28px;
+  align-items: center;
+}
+
+.scene-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.mail-form .el-form-item {
+  margin-bottom: 16px;
+}
+
+

@@ -1,0 +1,39 @@
+.el-card {
+  border-color: #dbe4f0;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+}
+
+.el-menu {
+  --el-menu-bg-color: transparent;
+  --el-menu-text-color: #334155;
+  --el-menu-active-color: #2563eb;
+  --el-menu-hover-bg-color: #eaf2ff;
+  --el-menu-item-height: 46px;
+  --el-menu-base-level-padding: 14px;
+}
+
+.el-menu-item.is-active {
+  background: linear-gradient(90deg, #e8f1ff 0%, #f4f8ff 100%);
+  border-radius: 10px;
+}
+
+.el-button--primary {
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.18);
+}
+
+.el-tag {
+  border-radius: 6px;
+}
+
+.el-table {
+  --el-table-border-color: #dbe4f0;
+  --el-table-header-bg-color: #f8fbff;
+  --el-table-row-hover-bg-color: #f3f7ff;
+}
+
+.el-timeline-item__node--primary {
+  background-color: #2563eb;
+}
+
+

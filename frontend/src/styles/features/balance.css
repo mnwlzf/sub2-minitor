@@ -1,0 +1,120 @@
+.balance-page-head {
+  margin-bottom: 18px;
+}
+
+.balance-page-head h2 {
+  margin: 0 0 8px;
+  color: #101828;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.balance-page-head p {
+  margin: 0;
+  color: #667085;
+}
+
+.balance-filter-card {
+  margin-bottom: 18px;
+  border-radius: 8px;
+}
+
+.balance-filter-card .el-card__body {
+  padding: 16px 18px;
+}
+
+.balance-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.balance-date-picker {
+  width: 280px;
+}
+
+.balance-platform-list {
+  display: grid;
+  gap: 18px;
+}
+
+.balance-platform-card {
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+
+.balance-platform-card .el-card__header {
+  padding: 18px 22px;
+}
+
+.balance-platform-card .el-card__body {
+  padding: 20px 22px;
+}
+
+.balance-platform-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.balance-platform-head h3 {
+  margin: 0;
+  color: #101828;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.balance-platform-head p {
+  margin: 6px 0 0;
+  color: #667085;
+}
+
+.balance-platform-head span {
+  color: #475467;
+}
+
+.balance-account-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+
+.balance-chart-card {
+  min-height: 260px;
+  padding: 18px;
+  border: 1px solid #dfe8f5;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.balance-chart-head,
+.balance-chart-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.balance-chart-head strong {
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.balance-chart {
+  width: 100%;
+  height: 240px;
+  margin-top: 10px;
+}
+
+.balance-chart-summary {
+  color: #667085;
+  font-size: 13px;
+}
+
+
