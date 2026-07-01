@@ -1,8 +1,9 @@
 package com.sub2.monitor.collect.service;
 
+import com.sub2.monitor.collect.dto.CollectGroupQueryRequest;
 import com.sub2.monitor.collect.dto.CollectGroupResponse;
 
 public interface CollectGroupQueryService {
 
-    CollectGroupResponse listGroups(String keyword, Boolean enabled);
+    CollectGroupResponse listGroups(CollectGroupQueryRequest request);
 }

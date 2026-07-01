@@ -2,6 +2,7 @@ package com.sub2.monitor.account.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.sub2.monitor.account.dto.AccountQueryRequest;
 import com.sub2.monitor.account.dto.AccountRequest;
 import com.sub2.monitor.account.dto.AccountResponse;
 import com.sub2.monitor.monitor.entity.Account;
@@ -25,16 +26,17 @@ public class AccountServiceImpl extends ServiceImpl<AccountMapper, Account> impl
     private final PlatformMapper platformMapper;
 
     @Override
-    public List<AccountResponse> listAccounts(Long platformId, String keyword) {
+    public List<AccountResponse> listAccounts(AccountQueryRequest request) {
+        AccountQueryRequest query = request == null ? new AccountQueryRequest() : request;
         LambdaQueryWrapper<Account> wrapper = new LambdaQueryWrapper<>();
-        if (platformId != null) {
-            wrapper.eq(Account::getPlatformId, platformId);
+        if (query.getPlatformId() != null) {
+            wrapper.eq(Account::getPlatformId, query.getPlatformId());
         }
-        if (StringUtils.hasText(keyword)) {
-            wrapper.and(query -> query
-                    .like(Account::getUsername, keyword)
+        if (StringUtils.hasText(query.getKeyword())) {
+            wrapper.and(accountQuery -> accountQuery
+                    .like(Account::getUsername, query.getKeyword())
                     .or()
-                    .like(Account::getEmail, keyword));
+                    .like(Account::getEmail, query.getKeyword()));
         }
         wrapper.orderByDesc(Account::getId);
 

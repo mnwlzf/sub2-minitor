@@ -1,5 +1,6 @@
 package com.sub2.monitor.monitor.controller;
 
+import com.sub2.monitor.monitor.dto.PlatformQueryRequest;
 import com.sub2.monitor.monitor.dto.PlatformSummaryResponse;
 import com.sub2.monitor.monitor.entity.Platform;
 import com.sub2.monitor.monitor.service.PlatformService;
@@ -11,7 +12,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -22,11 +22,8 @@ public class PlatformController {
     private final PlatformService platformService;
 
     @GetMapping
-    public PlatformSummaryResponse listPlatforms(
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Boolean enabled
-    ) {
-        return platformService.listPlatformSummary(keyword, enabled);
+    public PlatformSummaryResponse listPlatforms(PlatformQueryRequest request) {
+        return platformService.listPlatformSummary(request);
     }
 
     @PostMapping

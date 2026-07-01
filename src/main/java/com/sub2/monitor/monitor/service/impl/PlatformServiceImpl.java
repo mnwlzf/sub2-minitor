@@ -9,6 +9,7 @@ import com.sub2.monitor.collect.mapper.AccountBalanceRecordMapper;
 import com.sub2.monitor.collect.mapper.CollectGroupMapper;
 import com.sub2.monitor.collect.mapper.CollectSnapshotMapper;
 import com.sub2.monitor.collect.service.PlatformCollectBizService;
+import com.sub2.monitor.monitor.dto.PlatformQueryRequest;
 import com.sub2.monitor.monitor.dto.PlatformSummaryResponse;
 import com.sub2.monitor.monitor.entity.Account;
 import com.sub2.monitor.monitor.entity.Platform;
@@ -34,17 +35,18 @@ public class PlatformServiceImpl extends ServiceImpl<PlatformMapper, Platform> i
     private final PlatformCollectBizService platformCollectBizService;
 
     @Override
-    public PlatformSummaryResponse listPlatformSummary(String keyword, Boolean enabled) {
+    public PlatformSummaryResponse listPlatformSummary(PlatformQueryRequest request) {
+        PlatformQueryRequest query = request == null ? new PlatformQueryRequest() : request;
         LambdaQueryWrapper<Platform> wrapper = new LambdaQueryWrapper<>();
-        if (StringUtils.hasText(keyword)) {
-            wrapper.and(query -> query
-                    .like(Platform::getPlatformName, keyword)
+        if (StringUtils.hasText(query.getKeyword())) {
+            wrapper.and(platformQuery -> platformQuery
+                    .like(Platform::getPlatformName, query.getKeyword())
                     .or()
-                    .like(Platform::getBaseUrl, keyword)
+                    .like(Platform::getBaseUrl, query.getKeyword())
             );
         }
-        if (enabled != null) {
-            wrapper.eq(Platform::getEnabled, enabled);
+        if (query.getEnabled() != null) {
+            wrapper.eq(Platform::getEnabled, query.getEnabled());
         }
         wrapper.orderByDesc(Platform::getId);
 

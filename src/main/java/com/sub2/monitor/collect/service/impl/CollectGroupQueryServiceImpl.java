@@ -1,6 +1,7 @@
 package com.sub2.monitor.collect.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.sub2.monitor.collect.dto.CollectGroupQueryRequest;
 import com.sub2.monitor.collect.dto.CollectGroupResponse;
 import com.sub2.monitor.collect.entity.CollectGroup;
 import com.sub2.monitor.collect.mapper.CollectGroupMapper;
@@ -25,17 +26,18 @@ public class CollectGroupQueryServiceImpl implements CollectGroupQueryService {
     private final CollectGroupMapper collectGroupMapper;
 
     @Override
-    public CollectGroupResponse listGroups(String keyword, Boolean enabled) {
+    public CollectGroupResponse listGroups(CollectGroupQueryRequest request) {
+        CollectGroupQueryRequest query = request == null ? new CollectGroupQueryRequest() : request;
         LambdaQueryWrapper<Platform> wrapper = new LambdaQueryWrapper<>();
-        if (StringUtils.hasText(keyword)) {
-            wrapper.and(query -> query
-                    .like(Platform::getPlatformName, keyword)
+        if (StringUtils.hasText(query.getKeyword())) {
+            wrapper.and(platformQuery -> platformQuery
+                    .like(Platform::getPlatformName, query.getKeyword())
                     .or()
-                    .like(Platform::getBaseUrl, keyword)
+                    .like(Platform::getBaseUrl, query.getKeyword())
             );
         }
-        if (enabled != null) {
-            wrapper.eq(Platform::getEnabled, enabled);
+        if (query.getEnabled() != null) {
+            wrapper.eq(Platform::getEnabled, query.getEnabled());
         }
         wrapper.orderByDesc(Platform::getId);
 
