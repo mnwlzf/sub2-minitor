@@ -24,24 +24,25 @@ spring:
             misfireThreshold: 60000
   data:
     redis:
-      host: localhost
-      port: 6379
-      database: 0
-      timeout: 5s
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: ${REDIS_TIMEOUT:5s}
   datasource:
     dynamic:
-      primary: master
+      primary: ${DATASOURCE_PRIMARY:master}
       datasource:
         master:
           driver-class-name: com.mysql.cj.jdbc.Driver
-          url: jdbc:mysql://localhost:3306/sub2_monitor?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-          username: root
-          password: root
+          url: ${MYSQL_MASTER_URL:jdbc:mysql://localhost:3306/sub2_monitor?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+          username: ${MYSQL_MASTER_USERNAME:root}
+          password: ${MYSQL_MASTER_PASSWORD:root}
         slave:
           driver-class-name: com.mysql.cj.jdbc.Driver
-          url: jdbc:mysql://localhost:3306/sub2_monitor_slave?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-          username: root
-          password: root
+          url: ${MYSQL_SLAVE_URL:jdbc:mysql://localhost:3306/sub2_monitor_slave?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+          username: ${MYSQL_SLAVE_USERNAME:root}
+          password: ${MYSQL_SLAVE_PASSWORD:root}
     druid:
       initial-size: 5
       min-idle: 5
@@ -59,3 +60,6 @@ spring:
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+server:
+  port: ${SERVER_PORT:8080}

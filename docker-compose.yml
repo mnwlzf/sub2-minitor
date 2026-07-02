@@ -1,0 +1,48 @@
+services:
+  sub2-monitor:
+    image: ${APP_IMAGE:-sub2-monitor:latest}
+    container_name: sub2-monitor
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SERVER_PORT: 8080
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DATABASE: ${REDIS_DATABASE:-0}
+      MYSQL_MASTER_URL: ${MYSQL_MASTER_URL}
+      MYSQL_MASTER_USERNAME: ${MYSQL_MASTER_USERNAME}
+      MYSQL_MASTER_PASSWORD: ${MYSQL_MASTER_PASSWORD}
+      MYSQL_SLAVE_URL: ${MYSQL_SLAVE_URL:-${MYSQL_MASTER_URL}}
+      MYSQL_SLAVE_USERNAME: ${MYSQL_SLAVE_USERNAME:-${MYSQL_MASTER_USERNAME}}
+      MYSQL_SLAVE_PASSWORD: ${MYSQL_SLAVE_PASSWORD:-${MYSQL_MASTER_PASSWORD}}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - sub-monitor
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: sub-monitor-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - sub-monitor
+
+volumes:
+  redis-data:
+
+networks:
+  sub-monitor:
+    name: sub-monitor
