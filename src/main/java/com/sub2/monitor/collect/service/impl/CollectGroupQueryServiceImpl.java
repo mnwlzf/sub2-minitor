@@ -83,6 +83,8 @@ public class CollectGroupQueryServiceImpl implements CollectGroupQueryService {
         item.setPlatformRate(group.getRateMultiplier());
         item.setActualRate(group.getRateMultiplier());
         item.setStatus(group.getStatus());
+        item.setKeyCount(group.getKeyCount() == null ? 0 : group.getKeyCount());
+        item.setUsedByKey(Boolean.TRUE.equals(group.getUsedByKey()));
         item.setLastCollectedAt(group.getLastCollectedAt());
         return item;
     }

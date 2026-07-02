@@ -60,5 +60,7 @@ public class NewApiTokensResponse {
         private Boolean crossGroupRetry;
         @JsonProperty("DeletedAt")
         private String deletedAt;
+        @JsonProperty("full_key")
+        private String fullKey;
     }
 }

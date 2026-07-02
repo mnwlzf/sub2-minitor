@@ -11,8 +11,8 @@ import com.sub2.monitor.collect.sub2api.service.Sub2CollectService;
 import com.sub2.monitor.monitor.entity.Account;
 import com.sub2.monitor.monitor.mapper.AccountMapper;
 import io.netty.channel.ChannelOption;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class Sub2CollectServiceImpl implements Sub2CollectService {
 
     private static final String LOGIN_PATH = "/api/v1/auth/login";
@@ -49,11 +50,8 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
     private static final int ACCOUNT_INTERVAL_SECONDS = 5;
     private static final long TOKEN_CACHE_TIMEOUT_MINUTES = 120;
 
-    @Autowired
-    private AccountMapper accountMapper;
-
-    @Autowired
-    private RedisTemplate<String, String> redisTemplate; // 预留扩展
+    private final AccountMapper accountMapper;
+    private final RedisTemplate<String, String> redisTemplate;
 
     @Override
     public LoginResponse<Sub2LoginRes> login(String baseUrl) {
@@ -99,13 +97,12 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
 
             String token = getTokenOrLogin(baseUrl, account, client);
             if (token == null || token.isBlank()) {
+                log.warn("Sub2 可用分组采集跳过账号，token 不可用，账号={}，baseUrl={}", email, baseUrl);
                 continue;
             }
 
             // 每个账号使用自己的 Authorization 请求头，基础连接配置仍复用上面的 client。
-            WebClient requestClient = client.mutate()
-                    .defaultHeader("Authorization", "Bearer " + token)
-                    .build();
+            WebClient requestClient = buildBearerClient(client, token);
 
             log.info("开始请求 Sub2 可用分组，账号={}，url={}{}", email, baseUrl, AVAILABLE_GROUPS_PATH);
 
@@ -199,12 +196,11 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
 
             String token = getTokenOrLogin(baseUrl, account, client);
             if (token == null || token.isBlank()) {
+                log.warn("Sub2 密钥采集跳过账号，token 不可用，账号={}，baseUrl={}", email, baseUrl);
                 continue;
             }
 
-            WebClient requestClient = client.mutate()
-                    .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .build();
+            WebClient requestClient = buildBearerClient(client, token);
 
             log.info("开始请求 Sub2 密钥列表，账号={}，url={}{}", email, baseUrl, KEYS_PATH);
 
@@ -294,11 +290,10 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
             String email = account.getEmail();
             String token = getTokenOrLogin(baseUrl, account, client);
             if (token == null || token.isBlank()) {
+                log.warn("Sub2 用量统计采集跳过账号，token 不可用，账号={}，baseUrl={}", email, baseUrl);
                 continue;
             }
-            WebClient requestClient = client.mutate()
-                    .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                    .build();
+            WebClient requestClient = buildBearerClient(client, token);
             try {
                 Sub2UsageStatsResponse response = requestClient.get()
                         .uri(USAGE_STATS_PATH)
@@ -353,6 +348,7 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
             String email = account.getEmail();
             String token = getTokenOrLogin(baseUrl, account, client);
             if (token == null || token.isBlank()) {
+                log.warn("Sub2 用户信息采集跳过账号，token 不可用，账号={}，baseUrl={}", email, baseUrl);
                 continue;
             }
             try {
@@ -392,6 +388,12 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
                                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MILLIS)
                                 .responseTimeout(Duration.ofSeconds(RESPONSE_TIMEOUT_SECONDS))
                 ))
+                .build();
+    }
+
+    private WebClient buildBearerClient(WebClient client, String token) {
+        return client.mutate()
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .build();
     }
 
@@ -479,9 +481,7 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
     }
 
     private Sub2AvailableGroupsResponse requestAvailableGroups(String baseUrl, String email, WebClient client, String token) {
-        return client.mutate()
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .build()
+        return buildBearerClient(client, token)
                 .get()
                 .uri(AVAILABLE_GROUPS_PATH)
                 .exchangeToMono(clientResponse -> {
@@ -503,9 +503,7 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
     }
 
     private Sub2KeysResponse requestSub2Keys(String baseUrl, String email, WebClient client, String token) {
-        return client.mutate()
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .build()
+        return buildBearerClient(client, token)
                 .get()
                 .uri(KEYS_PATH)
                 .exchangeToMono(clientResponse -> {
@@ -527,9 +525,7 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
     }
 
     private Sub2UsageStatsResponse requestUsageStats(WebClient client, String token) {
-        return client.mutate()
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .build()
+        return buildBearerClient(client, token)
                 .get()
                 .uri(USAGE_STATS_PATH)
                 .exchangeToMono(clientResponse -> {
@@ -551,9 +547,7 @@ public class Sub2CollectServiceImpl implements Sub2CollectService {
     }
 
     private Sub2UserInfoResponse requestUserInfo(WebClient client, String token) {
-        return client.mutate()
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .build()
+        return buildBearerClient(client, token)
                 .get()
                 .uri(USER_INFO_PATH)
                 .exchangeToMono(clientResponse -> {

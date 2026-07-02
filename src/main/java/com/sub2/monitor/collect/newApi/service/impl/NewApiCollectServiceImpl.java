@@ -5,14 +5,15 @@ import com.sub2.monitor.collect.newApi.dto.NewApiGroupsResponse;
 import com.sub2.monitor.collect.newApi.dto.NewApiLoginReq;
 import com.sub2.monitor.collect.newApi.dto.NewApiLoginRes;
 import com.sub2.monitor.collect.newApi.dto.NewApiRawGroupsResponse;
+import com.sub2.monitor.collect.newApi.dto.NewApiTokenKeyResponse;
 import com.sub2.monitor.collect.newApi.dto.NewApiTokensResponse;
 import com.sub2.monitor.collect.newApi.dto.NewApiUserSelfResponse;
 import com.sub2.monitor.collect.newApi.service.NewApiCollectService;
 import com.sub2.monitor.monitor.entity.Account;
 import com.sub2.monitor.monitor.mapper.AccountMapper;
 import io.netty.channel.ChannelOption;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -35,12 +36,14 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class NewApiCollectServiceImpl implements NewApiCollectService {
 
     private static final String LOGIN_PATH = "/api/user/login";
     private static final String GROUPS_PATH = "/api/user/self/groups";
     private static final String USER_SELF_PATH = "/api/user/self";
-    private static final String TOKENS_PATH = "/api/token/?p=1&size=20";
+    private static final String TOKENS_PATH = "/api/token/?p=1&size=100";
+    private static final String TOKEN_KEY_PATH_TEMPLATE = "/api/token/%d/key";
     private static final String AUTHORIZATION_CACHE_PREFIX = "newapi:authorization:";
     private static final String COOKIE_CACHE_NAME = "cookie";
     private static final String NEW_API_USER_CACHE_NAME = "new-api-user";
@@ -52,11 +55,8 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
     private static final int ACCOUNT_INTERVAL_SECONDS = 5;
     private static final long SESSION_CACHE_TIMEOUT_MINUTES = 120;
 
-    @Autowired
-    private AccountMapper accountMapper;
-
-    @Autowired
-    private RedisTemplate<String, String> redisTemplate; // 预留扩展
+    private final AccountMapper accountMapper;
+    private final RedisTemplate<String, String> redisTemplate;
 
     @Override
     public LoginResponse<NewApiLoginRes> login(String baseUrl) {
@@ -99,13 +99,11 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
             String username = account.getUsername();
             SessionHeaders sessionHeaders = getSessionHeadersOrLogin(baseUrl, account, client);
             if (sessionHeaders == null) {
+                log.warn("NewApi 分组采集跳过账号，登录态不可用，账号={}，baseUrl={}", username, baseUrl);
                 continue;
             }
 
-            WebClient requestClient = client.mutate()
-                    .defaultHeader(HttpHeaders.COOKIE, sessionHeaders.cookie())
-                    .defaultHeader(NEW_API_USER_HEADER, sessionHeaders.newApiUser())
-                    .build();
+            WebClient requestClient = buildSessionClient(client, sessionHeaders);
 
             log.info("开始请求 NewApi 分组，账号={}，url={}{}", username, baseUrl, GROUPS_PATH);
             try {
@@ -192,13 +190,11 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
             String username = account.getUsername();
             SessionHeaders sessionHeaders = getSessionHeadersOrLogin(baseUrl, account, client);
             if (sessionHeaders == null) {
+                log.warn("NewApi 令牌采集跳过账号，登录态不可用，账号={}，baseUrl={}", username, baseUrl);
                 continue;
             }
 
-            WebClient requestClient = client.mutate()
-                    .defaultHeader(HttpHeaders.COOKIE, sessionHeaders.cookie())
-                    .defaultHeader(NEW_API_USER_HEADER, sessionHeaders.newApiUser())
-                    .build();
+            WebClient requestClient = buildSessionClient(client, sessionHeaders);
 
             log.info("开始请求 NewApi 令牌列表，账号={}，url={}{}", username, baseUrl, TOKENS_PATH);
             try {
@@ -245,6 +241,7 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
                         .block();
 
                 if (response != null) {
+                    fillTokenKeys(username, requestClient, response);
                     responses.add(response);
                     log.info("NewApi 令牌列表采集成功，账号={}，当前成功数量={}", username, responses.size());
                 } else {
@@ -284,13 +281,11 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
             String username = account.getUsername();
             SessionHeaders sessionHeaders = getSessionHeadersOrLogin(baseUrl, account, client);
             if (sessionHeaders == null) {
+                log.warn("NewApi 用户余额采集跳过账号，登录态不可用，账号={}，baseUrl={}", username, baseUrl);
                 continue;
             }
 
-            WebClient requestClient = client.mutate()
-                    .defaultHeader(HttpHeaders.COOKIE, sessionHeaders.cookie())
-                    .defaultHeader(NEW_API_USER_HEADER, sessionHeaders.newApiUser())
-                    .build();
+            WebClient requestClient = buildSessionClient(client, sessionHeaders);
             try {
                 NewApiUserSelfResponse response = requestClient.get()
                         .uri(USER_SELF_PATH)
@@ -346,6 +341,13 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
                                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MILLIS)
                                 .responseTimeout(Duration.ofSeconds(RESPONSE_TIMEOUT_SECONDS))
                 ))
+                .build();
+    }
+
+    private WebClient buildSessionClient(WebClient client, SessionHeaders sessionHeaders) {
+        return client.mutate()
+                .defaultHeader(HttpHeaders.COOKIE, sessionHeaders.cookie())
+                .defaultHeader(NEW_API_USER_HEADER, sessionHeaders.newApiUser())
                 .build();
     }
 
@@ -483,6 +485,7 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
         cookie = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, COOKIE_CACHE_NAME));
         newApiUser = redisTemplate.opsForValue().get(buildAuthorizationCacheKey(baseUrl, username, NEW_API_USER_CACHE_NAME));
         if (cookie == null || cookie.isBlank() || newApiUser == null || newApiUser.isBlank()) {
+            log.warn("NewApi 登录态刷新后仍缺少 Cookie 或 {}，账号={}，baseUrl={}", NEW_API_USER_HEADER, username, baseUrl);
             return null;
         }
         return new SessionHeaders(cookie, newApiUser);
@@ -494,10 +497,7 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
     }
 
     private NewApiGroupsResponse requestGroups(String username, WebClient client, SessionHeaders sessionHeaders) {
-        return client.mutate()
-                .defaultHeader(HttpHeaders.COOKIE, sessionHeaders.cookie())
-                .defaultHeader(NEW_API_USER_HEADER, sessionHeaders.newApiUser())
-                .build()
+        return buildSessionClient(client, sessionHeaders)
                 .get()
                 .uri(GROUPS_PATH)
                 .exchangeToMono(clientResponse -> {
@@ -519,10 +519,8 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
     }
 
     private NewApiTokensResponse requestTokens(String username, WebClient client, SessionHeaders sessionHeaders) {
-        return client.mutate()
-                .defaultHeader(HttpHeaders.COOKIE, sessionHeaders.cookie())
-                .defaultHeader(NEW_API_USER_HEADER, sessionHeaders.newApiUser())
-                .build()
+        WebClient requestClient = buildSessionClient(client, sessionHeaders);
+        NewApiTokensResponse response = requestClient
                 .get()
                 .uri(TOKENS_PATH)
                 .exchangeToMono(clientResponse -> {
@@ -541,13 +539,74 @@ public class NewApiCollectServiceImpl implements NewApiCollectService {
                             )));
                 })
                 .block();
+        fillTokenKeys(username, requestClient, response);
+        return response;
+    }
+
+    private void fillTokenKeys(String username, WebClient requestClient, NewApiTokensResponse response) {
+        List<NewApiTokensResponse.TokenItem> items = getTokenItems(response);
+        if (items.isEmpty()) {
+            log.info("NewApi 令牌列表为空，跳过密钥详情采集，账号={}", username);
+            return;
+        }
+        int successCount = 0;
+        int failedCount = 0;
+        for (NewApiTokensResponse.TokenItem item : items) {
+            if (item == null || item.getId() == null) {
+                continue;
+            }
+            try {
+                NewApiTokenKeyResponse keyResponse = requestTokenKey(requestClient, item.getId());
+                if (keyResponse != null && Boolean.TRUE.equals(keyResponse.getSuccess())
+                        && keyResponse.getData() != null && keyResponse.getData().getKey() != null) {
+                    item.setFullKey(keyResponse.getData().getKey());
+                    successCount++;
+                } else {
+                    failedCount++;
+                    log.warn("NewApi 令牌密钥详情返回空密钥，账号={}，tokenId={}", username, item.getId());
+                }
+            } catch (Exception e) {
+                Throwable rootCause = Exceptions.unwrap(e);
+                failedCount++;
+                log.warn("NewApi 令牌密钥详情采集失败，账号={}，tokenId={}，原因={}",
+                        username, item.getId(), rootCause.getMessage());
+            }
+        }
+        log.info("NewApi 令牌密钥详情采集完成，账号={}，令牌数量={}，成功={}，失败={}",
+                username, items.size(), successCount, failedCount);
+    }
+
+    private NewApiTokenKeyResponse requestTokenKey(WebClient requestClient, Long tokenId) {
+        return requestClient.get()
+                .uri(String.format(TOKEN_KEY_PATH_TEMPLATE, tokenId))
+                .exchangeToMono(clientResponse -> {
+                    HttpStatusCode status = clientResponse.statusCode();
+                    if (status.is2xxSuccessful()) {
+                        return clientResponse.bodyToMono(NewApiTokenKeyResponse.class);
+                    }
+                    return clientResponse.bodyToMono(String.class)
+                            .flatMap(errorBody -> Mono.error(new WebClientResponseException(
+                                    "NewApi token key failed: " + errorBody,
+                                    status.value(),
+                                    status.toString(),
+                                    null,
+                                    errorBody.getBytes(StandardCharsets.UTF_8),
+                                    StandardCharsets.UTF_8
+                            )));
+                })
+                .retryWhen(Retry.fixedDelay(RETRY_TIMES, Duration.ofSeconds(RETRY_DELAY_SECONDS)))
+                .block();
+    }
+
+    private List<NewApiTokensResponse.TokenItem> getTokenItems(NewApiTokensResponse response) {
+        if (response == null || response.getData() == null || response.getData().getItems() == null) {
+            return List.of();
+        }
+        return response.getData().getItems();
     }
 
     private NewApiUserSelfResponse requestUserSelf(WebClient client, SessionHeaders sessionHeaders) {
-        return client.mutate()
-                .defaultHeader(HttpHeaders.COOKIE, sessionHeaders.cookie())
-                .defaultHeader(NEW_API_USER_HEADER, sessionHeaders.newApiUser())
-                .build()
+        return buildSessionClient(client, sessionHeaders)
                 .get()
                 .uri(USER_SELF_PATH)
                 .exchangeToMono(clientResponse -> {

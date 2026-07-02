@@ -49,12 +49,15 @@ CREATE TABLE IF NOT EXISTS `collect_group` (
   `rate_multiplier` decimal(18,8) DEFAULT NULL COMMENT '倍率：Sub2 rate_multiplier，NewApi ratio',
   `status` varchar(32) DEFAULT NULL COMMENT '分组状态',
   `raw_json` json DEFAULT NULL COMMENT '分组原始JSON',
+  `key_count` int NOT NULL DEFAULT 0 COMMENT '使用该分组的密钥数量',
+  `used_by_key` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否被密钥使用：1是，0否',
   `last_collected_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '最近采集时间',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_collect_group_platform_name` (`platform_id`, `group_name`),
   KEY `idx_collect_group_platform` (`platform_id`),
+  KEY `idx_collect_group_used_by_key` (`used_by_key`),
   KEY `idx_collect_group_type` (`platform_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采集分组当前状态表';
 

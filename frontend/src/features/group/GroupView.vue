@@ -63,11 +63,11 @@
               v-for="group in platform.groups"
               :key="group.id"
               class="group-card"
-              :class="{ changed: isChanged(group) }"
+              :class="groupCardClasses(group)"
             >
               <div class="group-card-head">
                 <strong>{{ group.groupName }}</strong>
-                <span>平台 {{ formatRate(group.platformRate) }}</span>
+                <span>{{ formatKeyUsage(group) }}</span>
               </div>
               <div class="group-card-foot">
                 <span>{{ group.lastCollectedAt ? formatDate(group.lastCollectedAt) : '未采集' }}</span>
@@ -125,6 +125,12 @@ const formatPlatformType = (value: string) => (value?.toUpperCase() === 'SUB2API
 const formatRate = (value?: number | null) => Number(value ?? 0).toFixed(4)
 const formatDate = (value: string) => value.replace('T', ' ').slice(0, 16).replaceAll('-', '/')
 const isChanged = (group: GroupItem) => Number(group.platformRate ?? 0) !== Number(group.actualRate ?? 0)
+const isUsedByKey = (group: GroupItem) => Boolean(group.usedByKey)
+const formatKeyUsage = (group: GroupItem) => (isUsedByKey(group) ? `密钥 ${group.keyCount ?? 0}` : '未使用')
+const groupCardClasses = (group: GroupItem) => ({
+  changed: isChanged(group),
+  used: isUsedByKey(group),
+})
 
 onMounted(loadGroups)
 </script>

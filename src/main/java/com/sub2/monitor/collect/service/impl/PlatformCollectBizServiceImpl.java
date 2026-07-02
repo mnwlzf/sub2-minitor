@@ -28,8 +28,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -43,6 +44,10 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
 
     private static final String PLATFORM_TYPE_NEWAPI = "NEWAPI";
     private static final String PLATFORM_TYPE_SUB2API = "SUB2API";
+    private static final String COLLECT_TYPE_GROUPS = "GROUPS";
+    private static final String COLLECT_TYPE_KEYS = "KEYS";
+    private static final String COLLECT_TYPE_TOKENS = "TOKENS";
+    private static final BigDecimal NEWAPI_QUOTA_UNIT = BigDecimal.valueOf(500000);
 
     private final PlatformMapper platformMapper;
     private final AccountMapper accountMapper;
@@ -64,23 +69,30 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
     public void collectEnabledPlatforms() {
         List<Platform> platforms = platformMapper.selectList(new LambdaQueryWrapper<Platform>()
                 .eq(Platform::getEnabled, true));
+        log.info("开始执行启用平台采集，平台数量={}", platforms.size());
         for (Platform platform : platforms) {
             collectPlatform(platform);
         }
     }
 
     private void collectPlatform(Platform platform) {
+        long startedAt = System.currentTimeMillis();
         String type = normalizeType(platform);
         log.info("开始平台数据采集，platformId={}，type={}，baseUrl={}", platform.getId(), type, platform.getBaseUrl());
-        if (PLATFORM_TYPE_NEWAPI.equals(type)) {
-            collectNewApi(platform);
-            return;
+        try {
+            if (PLATFORM_TYPE_NEWAPI.equals(type)) {
+                collectNewApi(platform);
+                return;
+            }
+            if (PLATFORM_TYPE_SUB2API.equals(type)) {
+                collectSub2Api(platform);
+                return;
+            }
+            throw new IllegalArgumentException("不支持的平台类型: " + platform.getType());
+        } finally {
+            log.info("平台数据采集结束，platformId={}，type={}，耗时={}ms",
+                    platform.getId(), type, System.currentTimeMillis() - startedAt);
         }
-        if (PLATFORM_TYPE_SUB2API.equals(type)) {
-            collectSub2Api(platform);
-            return;
-        }
-        throw new IllegalArgumentException("不支持的平台类型: " + platform.getType());
     }
 
     private void collectNewApi(Platform platform) {
@@ -93,15 +105,18 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
         saveNewApiBalanceRecord(platform, userSelfResponse);
 
         NewApiGroupsResponse groupsResponse = newApiCollectService.collectGroups(platform.getBaseUrl());
-        saveSnapshot(platform, "GROUPS", isNewApiSuccess(groupsResponse), countNewApiGroups(groupsResponse),
+        saveSnapshot(platform, COLLECT_TYPE_GROUPS, isNewApiSuccess(groupsResponse), countNewApiGroups(groupsResponse),
                 groupsResponse == null ? null : groupsResponse.getMessage(), groupsResponse);
         if (isNewApiSuccess(groupsResponse)) {
             syncGroups(platform, toNewApiGroupRecords(groupsResponse));
         }
 
         NewApiTokensResponse tokensResponse = newApiCollectService.collectNewApiKeys(platform.getBaseUrl());
-        saveSnapshot(platform, "TOKENS", isNewApiSuccess(tokensResponse), countNewApiTokens(tokensResponse),
+        saveSnapshot(platform, COLLECT_TYPE_TOKENS, isNewApiSuccess(tokensResponse), countNewApiTokens(tokensResponse),
                 tokensResponse == null ? null : tokensResponse.getMessage(), tokensResponse);
+        if (isNewApiSuccess(tokensResponse)) {
+            syncKeyUsage(platform, toNewApiKeyGroupRecords(tokensResponse));
+        }
     }
 
     private void collectSub2Api(Platform platform) {
@@ -116,15 +131,18 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
         saveSub2BalanceRecord(platform, userInfoResponse, usageStatsResponse);
 
         Sub2AvailableGroupsResponse groupsResponse = sub2CollectService.collectSub2AvailableGroups(platform.getBaseUrl());
-        saveSnapshot(platform, "GROUPS", isSub2Success(groupsResponse), countSub2Groups(groupsResponse),
+        saveSnapshot(platform, COLLECT_TYPE_GROUPS, isSub2Success(groupsResponse), countSub2Groups(groupsResponse),
                 groupsResponse == null ? null : groupsResponse.getMessage(), groupsResponse);
         if (isSub2Success(groupsResponse)) {
             syncGroups(platform, toSub2GroupRecords(groupsResponse));
         }
 
         Sub2KeysResponse keysResponse = sub2CollectService.collectSub2Keys(platform.getBaseUrl());
-        saveSnapshot(platform, "KEYS", isSub2Success(keysResponse), countSub2Keys(keysResponse),
+        saveSnapshot(platform, COLLECT_TYPE_KEYS, isSub2Success(keysResponse), countSub2Keys(keysResponse),
                 keysResponse == null ? null : keysResponse.getMessage(), keysResponse);
+        if (isSub2Success(keysResponse)) {
+            syncKeyUsage(platform, toSub2KeyGroupRecords(keysResponse));
+        }
     }
 
     private void saveSnapshot(Platform platform, String collectType, boolean success, int itemCount, String message, Object payload) {
@@ -144,6 +162,8 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
                 .orderByDesc(CollectSnapshot::getId));
         if (snapshots.isEmpty()) {
             collectSnapshotMapper.insert(snapshot);
+            log.info("采集快照新增，platformId={}，type={}，success={}，itemCount={}",
+                    platform.getId(), collectType, success, itemCount);
             return;
         }
         CollectSnapshot existing = snapshots.get(0);
@@ -153,6 +173,8 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
                 .skip(1)
                 .map(CollectSnapshot::getId)
                 .forEach(collectSnapshotMapper::deleteById);
+        log.info("采集快照更新，platformId={}，type={}，success={}，itemCount={}，清理历史快照数量={}",
+                platform.getId(), collectType, success, itemCount, Math.max(0, snapshots.size() - 1));
     }
 
     private void saveSub2BalanceRecord(
@@ -161,6 +183,7 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
             Sub2UsageStatsResponse usageStatsResponse
     ) {
         if (userInfoResponse == null || userInfoResponse.getData() == null) {
+            log.warn("Sub2 用户信息响应为空，跳过余额入库，platformId={}", platform.getId());
             return;
         }
         var user = userInfoResponse.getData();
@@ -173,6 +196,7 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
 
     private void saveNewApiBalanceRecord(Platform platform, NewApiUserSelfResponse response) {
         if (response == null || response.getData() == null || response.getData().getQuota() == null) {
+            log.warn("NewApi 余额响应为空，跳过余额入库，platformId={}", platform.getId());
             return;
         }
         NewApiUserSelfResponse.UserInfo user = response.getData();
@@ -189,6 +213,7 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
             BigDecimal totalConsumption
     ) {
         if (balance == null) {
+            log.warn("余额为空，跳过余额记录，platformId={}，accountIdentity={}", platform.getId(), accountIdentity);
             return;
         }
         AccountBalanceRecord lastRecord = getLastBalanceRecord(account, platform, accountIdentity);
@@ -207,6 +232,8 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
         record.setRechargeAmount(rechargeAmount);
         record.setCollectedAt(LocalDateTime.now());
         accountBalanceRecordMapper.insert(record);
+        log.info("余额记录已保存，platformId={}，accountIdentity={}，balance={}，consumptionDelta={}，rechargeDelta={}",
+                platform.getId(), accountIdentity, balance, consumptionAmount, rechargeAmount);
     }
 
     private BigDecimal calculateConsumptionAmount(AccountBalanceRecord lastRecord, BigDecimal totalConsumption) {
@@ -257,7 +284,7 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
         if (quota == null) {
             return null;
         }
-        return BigDecimal.valueOf(quota).divide(BigDecimal.valueOf(500000), 8, java.math.RoundingMode.HALF_UP);
+        return BigDecimal.valueOf(quota).divide(NEWAPI_QUOTA_UNIT, 8, RoundingMode.HALF_UP);
     }
 
     private void syncGroups(Platform platform, List<GroupRecord> groupRecords) {
@@ -285,6 +312,8 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
                 log.info("采集发现减少分组，platformId={}，group={}", platform.getId(), entry.getKey());
             }
         }
+        log.info("平台分组同步完成，platformId={}，采集分组数={}，当前分组数={}",
+                platform.getId(), latestGroups.size(), currentGroups.size());
     }
 
     private void insertGroup(Platform platform, GroupRecord groupRecord) {
@@ -298,6 +327,8 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
         group.setRateMultiplier(groupRecord.rateMultiplier());
         group.setStatus(groupRecord.status());
         group.setRawJson(groupRecord.rawJson());
+        group.setKeyCount(0);
+        group.setUsedByKey(false);
         group.setLastCollectedAt(now);
         group.setCreatedAt(now);
         group.setUpdatedAt(now);
@@ -352,6 +383,65 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
                         BigDecimal.valueOf(group.getRateMultiplier()),
                         group.getStatus(),
                         toJson(group)))
+                .toList();
+    }
+
+    private void syncKeyUsage(Platform platform, List<String> keyGroups) {
+        // 密钥详情只影响“哪些分组正在被使用”的展示状态，分组基础信息仍以分组接口为准。
+        KeyUsageSummary summary = summarizeKeyUsage(keyGroups);
+        List<CollectGroup> groups = collectGroupMapper.selectList(new LambdaQueryWrapper<CollectGroup>()
+                .eq(CollectGroup::getPlatformId, platform.getId()));
+
+        int changedCount = 0;
+        for (CollectGroup group : groups) {
+            if (updateGroupKeyUsageIfChanged(group, summary.keyCountByGroup())) {
+                changedCount++;
+            }
+        }
+        log.info("分组密钥使用状态同步完成，platformId={}，密钥分组数={}，命中分组数={}，更新分组数={}",
+                platform.getId(), keyGroups.size(), summary.usedGroupCount(), changedCount);
+    }
+
+    private KeyUsageSummary summarizeKeyUsage(List<String> keyGroups) {
+        Map<String, Long> keyCountByGroup = keyGroups.stream()
+                .filter(group -> group != null && !group.isBlank())
+                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+        return new KeyUsageSummary(keyCountByGroup, keyCountByGroup.size());
+    }
+
+    private boolean updateGroupKeyUsageIfChanged(CollectGroup group, Map<String, Long> keyCountByGroup) {
+        int keyCount = keyCountByGroup.getOrDefault(group.getGroupName(), 0L).intValue();
+        boolean usedByKey = keyCount > 0;
+        if (Objects.equals(group.getKeyCount(), keyCount)
+                && Objects.equals(Boolean.TRUE.equals(group.getUsedByKey()), usedByKey)) {
+            return false;
+        }
+        group.setKeyCount(keyCount);
+        group.setUsedByKey(usedByKey);
+        group.setUpdatedAt(LocalDateTime.now());
+        collectGroupMapper.updateById(group);
+        log.info("分组密钥使用状态变化，platformId={}，group={}，keyCount={}，usedByKey={}",
+                group.getPlatformId(), group.getGroupName(), keyCount, usedByKey);
+        return true;
+    }
+
+    private List<String> toNewApiKeyGroupRecords(NewApiTokensResponse response) {
+        if (response == null || response.getData() == null || response.getData().getItems() == null) {
+            return List.of();
+        }
+        return response.getData().getItems().stream()
+                .map(NewApiTokensResponse.TokenItem::getGroup)
+                .toList();
+    }
+
+    private List<String> toSub2KeyGroupRecords(Sub2KeysResponse response) {
+        if (response == null || response.getData() == null || response.getData().getItems() == null) {
+            return List.of();
+        }
+        return response.getData().getItems().stream()
+                .map(Sub2KeysResponse.KeyItem::getGroup)
+                .filter(Objects::nonNull)
+                .map(Sub2KeysResponse.GroupInfo::getName)
                 .toList();
     }
 
@@ -430,6 +520,12 @@ public class PlatformCollectBizServiceImpl implements PlatformCollectBizService 
             BigDecimal rateMultiplier,
             String status,
             String rawJson
+    ) {
+    }
+
+    private record KeyUsageSummary(
+            Map<String, Long> keyCountByGroup,
+            int usedGroupCount
     ) {
     }
 }

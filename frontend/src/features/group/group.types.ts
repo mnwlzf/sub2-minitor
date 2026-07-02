@@ -23,5 +23,7 @@ export interface GroupItem {
   platformRate?: number | null
   actualRate?: number | null
   status?: string | null
+  keyCount?: number | null
+  usedByKey?: boolean | null
   lastCollectedAt?: string | null
 }

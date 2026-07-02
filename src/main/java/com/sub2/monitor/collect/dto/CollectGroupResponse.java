@@ -34,6 +34,8 @@ public class CollectGroupResponse {
         private BigDecimal platformRate;
         private BigDecimal actualRate;
         private String status;
+        private Integer keyCount;
+        private Boolean usedByKey;
         private LocalDateTime lastCollectedAt;
     }
 }

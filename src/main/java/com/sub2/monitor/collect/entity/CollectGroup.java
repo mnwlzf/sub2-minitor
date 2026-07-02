@@ -38,6 +38,12 @@ public class CollectGroup {
     @TableField("raw_json")
     private String rawJson;
 
+    @TableField("key_count")
+    private Integer keyCount;
+
+    @TableField("used_by_key")
+    private Boolean usedByKey;
+
     @TableField("last_collected_at")
     private LocalDateTime lastCollectedAt;
 
