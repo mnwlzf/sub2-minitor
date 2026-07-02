@@ -19,7 +19,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: sub2-monitor
+  IMAGE_NAME: sub2-minitor
 
 jobs:
   build-and-push:
