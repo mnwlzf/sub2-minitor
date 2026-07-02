@@ -48,7 +48,7 @@
               <strong>{{ account.accountIdentity || '未知账号' }}</strong>
               <el-tag type="primary" effect="light">当前余额 {{ formatMoney(account.currentBalance) }}</el-tag>
             </div>
-            <BalanceChart :points="account.points" />
+            <BalanceChart :key="chartKey(account)" :points="account.points" />
             <div class="balance-chart-summary">
               <span>今日消耗 {{ formatMoney(account.todayConsumption) }}</span>
               <span>今日到账 {{ formatMoney(account.todayRecharge) }}</span>
@@ -75,6 +75,7 @@ type RangeMode = 'today' | 'threeDays' | 'sevenDays' | 'custom'
 
 const loading = ref(false)
 const platforms = ref<PlatformBalanceItem[]>([])
+let requestId = 0
 const filters = reactive<{
   keyword: string
   enabled: boolean | null
@@ -111,6 +112,7 @@ const syncDateRangeByMode = () => {
 }
 
 const loadBalances = async () => {
+  const currentRequestId = ++requestId
   loading.value = true
   try {
     const [startDate, endDate] = filters.dateRange
@@ -120,11 +122,16 @@ const loadBalances = async () => {
       startDate: startDate || undefined,
       endDate: endDate || undefined,
     })
+    if (currentRequestId !== requestId) return
     platforms.value = data.items ?? []
   } catch (error) {
-    ElMessage.error('加载余额失败')
+    if (currentRequestId === requestId) {
+      ElMessage.error('加载余额失败')
+    }
   } finally {
-    loading.value = false
+    if (currentRequestId === requestId) {
+      loading.value = false
+    }
   }
 }
 
@@ -140,6 +147,8 @@ const handleDateRangeChange = () => {
 
 const formatMoney = (value?: number | null) => Number(value ?? 0).toFixed(2)
 const accountKey = (account: AccountBalanceItem) => `${account.accountId ?? 'unknown'}:${account.accountIdentity ?? ''}`
+const chartRangeKey = () => filters.dateRange.join(':')
+const chartKey = (account: AccountBalanceItem) => `${accountKey(account)}:${chartRangeKey()}`
 const isToday = (value: string | number | Date) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
@@ -260,7 +269,7 @@ const BalanceChart = defineComponent({
             areaStyle: { color: 'rgba(52, 120, 255, 0.14)' },
           },
         ],
-      })
+      }, true)
     }
 
     const resizeChart = () => chart?.resize()
