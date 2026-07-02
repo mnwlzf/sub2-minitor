@@ -23,6 +23,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AccountServiceImpl extends ServiceImpl<AccountMapper, Account> implements AccountService {
 
+    private static final String PLATFORM_TYPE_SUB2API = "SUB2API";
+    private static final String PLATFORM_TYPE_NEWAPI = "NEWAPI";
+
     private final PlatformMapper platformMapper;
 
     @Override
@@ -73,22 +76,54 @@ public class AccountServiceImpl extends ServiceImpl<AccountMapper, Account> impl
     }
 
     private void applyRequest(Account account, AccountRequest request, Platform platform, boolean creating) {
-        if (!StringUtils.hasText(request.getUsername()) && !StringUtils.hasText(request.getEmail())) {
-            throw new IllegalArgumentException("账号或邮箱不能为空");
-        }
+        validateIdentityByPlatform(request, platform);
         if (creating && !StringUtils.hasText(request.getPassword())) {
             throw new IllegalArgumentException("密码不能为空");
         }
 
         account.setPlatformId(platform.getId());
         account.setPlatformName(platform.getPlatformName());
-        account.setUsername(trimToNull(request.getUsername()));
-        account.setEmail(trimToNull(request.getEmail()));
+        applyIdentityByPlatform(account, request, platform);
         account.setTestModel(trimToNull(request.getTestModel()));
         account.setIsCollect(request.getIsCollect() == null || request.getIsCollect());
         if (StringUtils.hasText(request.getPassword())) {
             account.setPassword(request.getPassword().trim());
         }
+    }
+
+    private void validateIdentityByPlatform(AccountRequest request, Platform platform) {
+        String platformType = normalizeType(platform);
+        if (PLATFORM_TYPE_SUB2API.equals(platformType)) {
+            if (!StringUtils.hasText(request.getEmail())) {
+                throw new IllegalArgumentException("Sub2Api 平台邮箱不能为空");
+            }
+            return;
+        }
+        if (PLATFORM_TYPE_NEWAPI.equals(platformType)) {
+            if (!StringUtils.hasText(request.getUsername())) {
+                throw new IllegalArgumentException("NewApi 平台用户名不能为空");
+            }
+            return;
+        }
+        if (!StringUtils.hasText(request.getUsername()) && !StringUtils.hasText(request.getEmail())) {
+            throw new IllegalArgumentException("账号或邮箱不能为空");
+        }
+    }
+
+    private void applyIdentityByPlatform(Account account, AccountRequest request, Platform platform) {
+        String platformType = normalizeType(platform);
+        if (PLATFORM_TYPE_SUB2API.equals(platformType)) {
+            account.setUsername(null);
+            account.setEmail(trimToNull(request.getEmail()));
+            return;
+        }
+        if (PLATFORM_TYPE_NEWAPI.equals(platformType)) {
+            account.setUsername(trimToNull(request.getUsername()));
+            account.setEmail(null);
+            return;
+        }
+        account.setUsername(trimToNull(request.getUsername()));
+        account.setEmail(trimToNull(request.getEmail()));
     }
 
     private AccountResponse toResponse(Account account, Platform platform) {
@@ -128,6 +163,10 @@ public class AccountServiceImpl extends ServiceImpl<AccountMapper, Account> impl
             return null;
         }
         return value.trim();
+    }
+
+    private String normalizeType(Platform platform) {
+        return platform.getType() == null ? "" : platform.getType().trim().toUpperCase();
     }
 
 }

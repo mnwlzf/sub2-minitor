@@ -67,11 +67,11 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="账号" prop="username">
-          <el-input v-model="formState.username" placeholder="请输入账号" />
+        <el-form-item v-if="isNewApiPlatform" label="用户名" prop="username">
+          <el-input v-model="formState.username" placeholder="请输入 NewApi 用户名" />
         </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input v-model="formState.email" placeholder="请输入邮箱，账号为空时可用邮箱登录" />
+        <el-form-item v-if="isSub2Platform" label="邮箱" prop="email">
+          <el-input v-model="formState.email" placeholder="请输入 Sub2Api 登录邮箱" />
         </el-form-item>
         <el-form-item label="密码" prop="password">
           <el-input
@@ -97,7 +97,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import AppShell from '../../components/AppShell.vue'
@@ -135,11 +135,23 @@ const rules = computed<FormRules<AccountForm>>(() => ({
   username: [
     {
       validator: (_rule, value, callback) => {
-        if (String(value || '').trim() || formState.email.trim()) {
+        if (!isNewApiPlatform.value || String(value || '').trim()) {
           callback()
           return
         }
-        callback(new Error('请输入账号或邮箱'))
+        callback(new Error('请输入 NewApi 用户名'))
+      },
+      trigger: 'blur',
+    },
+  ],
+  email: [
+    {
+      validator: (_rule, value, callback) => {
+        if (!isSub2Platform.value || String(value || '').trim()) {
+          callback()
+          return
+        }
+        callback(new Error('请输入 Sub2Api 登录邮箱'))
       },
       trigger: 'blur',
     },
@@ -159,6 +171,10 @@ const rules = computed<FormRules<AccountForm>>(() => ({
 }))
 
 const dialogTitle = computed(() => (editingId.value ? '编辑账号' : '添加账号'))
+const selectedPlatform = computed(() => platformOptions.value.find((platform) => platform.id === formState.platformId))
+const selectedPlatformType = computed(() => String(selectedPlatform.value?.type || '').toUpperCase())
+const isSub2Platform = computed(() => selectedPlatformType.value === 'SUB2API')
+const isNewApiPlatform = computed(() => selectedPlatformType.value === 'NEWAPI')
 
 const loadPlatforms = async () => {
   const data = await listPlatforms({})
@@ -203,13 +219,14 @@ const submitForm = async () => {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
 
+  const payload = buildAccountPayload()
   submitLoading.value = true
   try {
     if (editingId.value) {
-      await updateAccount(editingId.value, { ...formState })
+      await updateAccount(editingId.value, payload)
       ElMessage.success('账号已更新')
     } else {
-      await createAccount({ ...formState })
+      await createAccount(payload)
       ElMessage.success('账号已添加')
     }
     dialogVisible.value = false
@@ -248,6 +265,26 @@ const formatType = (type?: string | null) => {
   if (upper === 'NEWAPI') return 'NewApi'
   return type || '-'
 }
+
+const buildAccountPayload = (): AccountForm => ({
+  ...formState,
+  username: isNewApiPlatform.value ? formState.username.trim() : '',
+  email: isSub2Platform.value ? formState.email.trim() : '',
+  password: formState.password.trim(),
+  testModel: formState.testModel.trim(),
+})
+
+watch(
+  () => formState.platformId,
+  () => {
+    if (isSub2Platform.value) {
+      formState.username = ''
+    } else if (isNewApiPlatform.value) {
+      formState.email = ''
+    }
+    formRef.value?.clearValidate(['username', 'email'])
+  }
+)
 
 onMounted(async () => {
   try {
